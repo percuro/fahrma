@@ -71,6 +71,8 @@ export default defineConfig({
     environment: 'node',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts'],
+    // styles/tokens.test.ts reads theme.css as text; without this, style files are empty in tests
+    css: true,
   },
   // Development: the backend (uvicorn app.web:application) serves /api like in production
   server: {

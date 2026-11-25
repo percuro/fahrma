@@ -49,5 +49,5 @@ export function OfflineBanner() {
   const t = useT();
   const online = useOnline();
   if (online) return null;
-  return <div className="offline-banner" role="status">{t.offline.banner}</div>;
+  return <div className="banner warn" role="status">{t.offline.banner}</div>;
 }

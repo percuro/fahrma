@@ -15,6 +15,8 @@ Dockerfile  single image: builds the frontend, serves it and the API (/api) with
 | `frontend/src/i18n/de.ts`, `en.ts` | All interface texts, including those for error codes and settlement warnings |
 | `frontend/src/lib/format.ts` | Formatting by language and group currency, tolerant parsing of typed numbers |
 | `frontend/src/app/brand.ts`, `backend/app/config.py` | Product name (see [renaming.md](renaming.md)) |
+| `frontend/src/styles/`, `frontend/src/components/Icons.tsx` | Styles in five layers and the icon set (see [design-language.md](design-language.md)) |
+| `frontend/src/app/icon.svg` | App icon; `node scripts/icons.mjs` in `frontend/` writes the files in `public/` (needs `rsvg-convert`) |
 
 Units: money in integer cents of the group's currency, distances in whole km, fuel quantities in thousandths of the car's unit (ml or Wh).
 

@@ -1,0 +1,104 @@
+/*
+ * fahrma only: patterns that exist in this app alone. Shared components live in
+ * components.css, colours in theme.css. See docs/design-language.md.
+ */
+
+/* ---------- App frame ---------- */
+/*
+ * An installed app on an iPhone draws under the status bar, whose text is always white
+ * there (index.html: black-translucent). The top bar is dark; this strip keeps the
+ * status bar dark on the pages without one (login, loading).
+ */
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; z-index: 60;
+  height: env(safe-area-inset-top); background: var(--chrome);
+}
+.center { padding-top: calc(var(--space-4) + env(safe-area-inset-top)); }
+
+/* ---------- Utilities ---------- */
+.mt-05 { margin-top: var(--space-2); }
+.mt-1 { margin-top: var(--space-4); }
+.mb-075 { margin-bottom: var(--space-3); }
+.align-end { align-self: end; }
+.version { margin-top: var(--space-6); font-size: var(--text-sm); }
+.link-row { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+.button-row { margin-top: var(--space-4); }
+.dialog .button-row { margin-top: 0; }
+.row .meta { overflow: hidden; text-overflow: ellipsis; }
+.row .meta.wrap { white-space: normal; }
+.error.small { font-size: var(--text-sm); }
+.share { min-width: 3rem; text-align: right; }
+
+/* ---------- Signed out ---------- */
+.card.login { width: 100%; max-width: 24rem; display: grid; gap: var(--space-4); box-shadow: var(--shadow); }
+.check.radio { align-items: flex-start; padding: var(--space-1) 0; }
+.check.radio input { margin-top: 0.15rem; }
+
+/* Operator links (imprint, privacy, terms) */
+.legal-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); }
+.legal-links a { color: var(--muted); min-height: var(--tap); display: inline-flex; align-items: center; }
+
+/* ---------- Overview ---------- */
+/* Quick entry: the three things people do next to the car */
+.quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-2); margin-bottom: var(--space-4); }
+.quick-actions .button {
+  flex-direction: column; gap: var(--space-1); min-height: 4.5rem; padding: var(--space-2);
+  font-size: var(--text-sm); text-align: center;
+}
+.quick-actions .button svg { width: 1.5rem; height: 1.5rem; }
+
+/* A running trip: the odometer reading at the start is the figure of the card */
+.running-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+/* Odometer field and the button that ends the trip: stacked on a phone, the button full width */
+.finish-row { display: grid; gap: var(--space-3); }
+@media (min-width: 37.5rem) { .finish-row { grid-template-columns: 1fr auto; align-items: end; } }
+
+/* Entries waiting on this device: marked, but not the one featured card */
+.card.highlight { border-color: var(--highlight); box-shadow: inset 0 0 0 1px var(--highlight); }
+/* A draft: the entry (opens it), its state and, for some, buttons */
+.draft-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.draft-row > .row { flex: 1; min-width: 12rem; }
+
+/* ---------- Settlement ---------- */
+.transfer { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; padding: var(--space-3) 0; }
+.transfer .who { flex: 1; min-width: 10rem; }
+
+/* ---------- History ---------- */
+.tabs-inline { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); overflow-x: auto; padding: 3px; margin-inline: -3px; }
+
+/* ---------- Account and group ---------- */
+/* Collapsible card (password, deleting): the heading is the toggle */
+details.card > summary { list-style: none; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::before { content: "▸"; color: var(--muted); }
+details.card[open] > summary::before { transform: rotate(90deg); }
+h2.inline { display: inline; margin: 0; font-size: var(--text-lg); }
+.danger-zone { border-color: var(--danger-text); }
+.danger-zone > summary h2 { color: var(--danger-text); }
+
+/* ---------- Statistics ---------- */
+.filters { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+.filters .field { flex: 1 1 10rem; }
+.split { display: grid; gap: 0 var(--space-3); align-items: start; }
+@media (min-width: 37.5rem) { .split { grid-template-columns: 1fr 1fr; } }
+
+.chart { position: relative; margin-bottom: var(--space-3); }
+.chart svg { display: block; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-axis { fill: var(--muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.chart-bar { fill: var(--accent); }
+.chart-bar.active { fill: color-mix(in srgb, var(--accent) 75%, var(--text)); }
+.chart-tooltip {
+  position: absolute; top: 0; transform: translateX(-50%); pointer-events: none; white-space: nowrap;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-s);
+  box-shadow: var(--shadow); padding: var(--space-1) var(--space-2); font-size: var(--text-sm);
+}
+
+/* ---------- Calendar: week navigation and one section per day ---------- */
+.week-nav { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-bottom: var(--space-2); }
+.week-nav strong { flex: 1; text-align: center; min-width: 10rem; }
+.day-title { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-md); margin: var(--space-4) 0 var(--space-2); }
+
+@media (prefers-reduced-motion: no-preference) {
+  details.card > summary::before { transition: transform var(--dur-1) var(--ease); }
+}

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+A new look, and one design language shared with pomale.
+
+- **New look "night drive"**: ink blue and headlight amber, a dark top bar in the light and the dark scheme, a new app icon. People who have the app on their home screen see the new icon after adding it again.
+- A **running trip** is a dark card at the top of the overview with its odometer reading as a large figure; your own balance is the large figure below.
+- The **navigation** marks the active area with an amber pill. It sits at the bottom on phones and tablets and moves into the top bar from 840 px (before: 960 px).
+- Edges of fields and buttons and the focus ring are clearly stronger (at least 3 : 1), the labels of the navigation grew to 12 px, dialogs open as a sheet from the bottom on a phone.
+- On iPhone and iPad the text follows the system text size. The window title names the page ("New trip · fahrma").
+- Styles are split into five layers (`frontend/src/styles/`), with one set of colour roles and components shared with pomale, see the [design language](docs/design-language.md). A test checks 40 colour pairs against the WCAG contrast minimum in both schemes; the end-to-end tests scan the main pages for WCAG 2.2 AA violations and for sideways scrolling at 320 px.
+- Fixed: the link to a car's statistics on the overview had a name for screen readers that did not contain its visible text.
+
 ## 0.7.0 – 2026-11-25
 
 Reserving cars, and reminders on the phone.

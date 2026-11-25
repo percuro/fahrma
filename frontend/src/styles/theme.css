@@ -1,0 +1,116 @@
+/*
+ * fahrma, "Nachtfahrt": ink blue and headlight amber on cool greys, a dark top bar
+ * in both colour schemes, firmer corners. Role names are shared with pomale;
+ * see docs/design-language.md. Every pair is checked by styles/tokens.test.ts.
+ */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #e8ecf1;
+  --text: #14202e;
+  --muted: #566373;
+  --border: #d3d9e1;
+  --border-strong: #7d8998;
+
+  --accent: #1b5a8f;
+  --accent-fill: #14263a;
+  --on-accent-fill: #ffffff;
+  --accent-soft: #dfeaf5;
+  --on-accent-soft: #17466f;
+  --highlight: #f5bd4f;
+  --on-highlight: #1c1606;
+
+  --chrome: #14263a;
+  --on-chrome: #ffffff;
+  --chrome-muted: #b9c6d6;
+  --chrome-brand: #f5bd4f;
+  --chrome-border: #14263a;
+  --chrome-focus: #ffe1a0;
+
+  --feature-bg: #14263a;
+  --feature-text: #ffffff;
+  --feature-muted: #b9c6d6;
+  --feature-border: #14263a;
+  --feature-accent: #f5bd4f;
+  --feature-fill: #f5bd4f;
+  --on-feature-fill: #1c1606;
+  --feature-danger: #ffb4a6;
+  --feature-focus: #ffe1a0;
+
+  --plus: #1a7446;
+  --minus: #b3361f;
+  --danger: #b3261b;
+  --on-danger: #ffffff;
+  --danger-text: #a3261b;
+  --danger-bg: #fde8e6;
+  --warn-bg: #fff1cc;
+  --warn-text: #674900;
+  --info-bg: #dfeaf5;
+  --info-text: #17466f;
+  --ok-bg: #dcefe3;
+  --ok-text: #1c5a39;
+
+  --focus: #1b5fd1;
+  --shadow: 0 0.5rem 1.5rem rgb(15 23 42 / 0.18);
+
+  --radius-s: 0.375rem;
+  --radius-m: 0.625rem;
+  --radius-l: 0.875rem;
+  --radius-button: 0.625rem;
+  --radius-field: 0.5rem;
+  --radius-pill: 999px;
+  --font-display: var(--font-ui);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d131a;
+    --surface: #161e28;
+    --surface-2: #1f2935;
+    --text: #e8edf3;
+    --muted: #9eabba;
+    --border: #303d4c;
+    --border-strong: #6f7f91;
+
+    --accent: #f5bd4f;
+    --accent-fill: #f5bd4f;
+    --on-accent-fill: #1c1606;
+    --accent-soft: #3a2f12;
+    --on-accent-soft: #f8d58a;
+    --highlight: #f5bd4f;
+    --on-highlight: #1c1606;
+
+    --chrome: #14263a;
+    --on-chrome: #ffffff;
+    --chrome-muted: #b9c6d6;
+    --chrome-brand: #f5bd4f;
+    --chrome-border: #22364c;
+    --chrome-focus: #ffe1a0;
+
+    --feature-bg: #14263a;
+    --feature-text: #ffffff;
+    --feature-muted: #b9c6d6;
+    --feature-border: #2b4460;
+    --feature-accent: #f5bd4f;
+    --feature-fill: #f5bd4f;
+    --on-feature-fill: #1c1606;
+    --feature-danger: #ffb4a6;
+    --feature-focus: #ffe1a0;
+
+    --plus: #6fd39e;
+    --minus: #ff8f7a;
+    --danger: #ff8f7a;
+    --on-danger: #2a0b06;
+    --danger-text: #ff9d8b;
+    --danger-bg: #3b1c1a;
+    --warn-bg: #3a3014;
+    --warn-text: #f3d68a;
+    --info-bg: #1b3043;
+    --info-text: #b4d3ee;
+    --ok-bg: #1e3b2c;
+    --ok-text: #a8e2c2;
+
+    --focus: #8cb6ff;
+    --shadow: 0 0.5rem 1.5rem rgb(0 0 0 / 0.5);
+  }
+}

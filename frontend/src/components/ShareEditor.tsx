@@ -1,5 +1,6 @@
 import type { Member, Share } from '../lib/types';
 import { useT } from '../i18n';
+import { MinusIcon, PlusIcon } from './Icons';
 
 interface Props {
   members: Member[];
@@ -36,10 +37,10 @@ export function ShareEditor({ members, value, onChange }: Props) {
               <li key={s.user_id} className="row">
                 <span className="main">{name}</span>
                 <span className="subtle small num">{Math.round((s.weight / total) * 100)} %</span>
-                <span className="weight" role="group" aria-label={t.weight(name)}>
-                  <button type="button" aria-label={t.decrease(name)} onClick={() => setWeight(s.user_id, s.weight - 1)}>−</button>
-                  <output className="num" aria-live="polite">{s.weight}</output>
-                  <button type="button" aria-label={t.increase(name)} onClick={() => setWeight(s.user_id, s.weight + 1)}>+</button>
+                <span className="stepper" role="group" aria-label={t.weight(name)}>
+                  <button type="button" className="button icon" aria-label={t.decrease(name)} onClick={() => setWeight(s.user_id, s.weight - 1)}><MinusIcon /></button>
+                  <output aria-live="polite">{s.weight}</output>
+                  <button type="button" className="button icon" aria-label={t.increase(name)} onClick={() => setWeight(s.user_id, s.weight + 1)}><PlusIcon /></button>
                 </span>
               </li>
             );

@@ -75,7 +75,7 @@ export function DashboardPage() {
       <Drafts trips={trips.data ?? []} />
 
       {activeCars.length > 0 && (
-        <div className="actions">
+        <div className="quick-actions">
           <Link className="button primary" to={`/g/${gid}/trip/new`}><CarIcon />{d.trip}</Link>
           <Link className="button" to={`/g/${gid}/fuel/new`}>
             {kind === 'charge' ? <BoltIcon /> : <FuelIcon />}
@@ -190,7 +190,7 @@ function Balance({ balance, activeCars }: { balance: BalanceData; activeCars: Ca
   return (
     <>
       <div className="stats">
-        <div className="stat">
+        <div className="stat hero">
           <div className="label">{d.yourBalance}</div>
           <div className={`value ${tone(myBalance)}`}>{f.money(myBalance)}</div>
           <div className="subtle small">{myBalance < 0 ? d.youPay : myBalance > 0 ? d.youGet : d.even}</div>
@@ -201,7 +201,9 @@ function Balance({ balance, activeCars }: { balance: BalanceData; activeCars: Ca
           <div className="subtle small">{balance.period_start ? d.sinceDate(f.date(balance.period_start)) : d.sinceStart}</div>
         </div>
         {balance.cars.filter((c) => activeCars.some((a) => a.id === c.car_id)).map((c) => (
-          <Link className="stat link" key={c.car_id} to={`/g/${gid}/stats?car=${c.car_id}`} aria-label={d.carStats(c.name)}>
+          <Link className="stat" key={c.car_id} to={`/g/${gid}/stats?car=${c.car_id}`}>
+            {/* The name of the link contains what is visible, and says where it leads */}
+            <span className="sr-only">{d.carStats(c.name)}: </span>
             <div className="label">{c.name}</div>
             <div className="value">{f.rate(c.rate_cents_per_km ?? c.last_rate_cents_per_km)}</div>
             <div className="subtle small">
@@ -376,15 +378,22 @@ function FinishTrip({ trip, car, driver }: { trip: Trip; car?: Car; driver: stri
   if (pending) return null;
   const errorId = `finish-${trip.id}-error`;
   return (
-    <form className="card form highlight" onSubmit={submit}>
-      <div>{d.onTheRoad(car?.name ?? t.common.car, driver, f.date(trip.date), f.km(trip.start_km))}</div>
-      <div className="grid-2">
+    <form className="card feature form" onSubmit={submit}>
+      <div className="running-head">
+        <span className="badge accent">{d.running}</span>
+        <strong>{d.carOnTheRoad(car?.name ?? t.common.car)}</strong>
+      </div>
+      <div>
+        <div className="figure">{f.km(trip.start_km)}</div>
+        <div className="subtle small">{d.startedBy(driver, f.date(trip.date))}</div>
+      </div>
+      <div className="finish-row">
         <label className="field">
           <span>{d.odometerNow}</span>
           <input inputMode="numeric" value={endKm} onChange={(e) => setEndKm(e.target.value)} required
             aria-invalid={finish.isError} aria-describedby={finish.isError ? errorId : undefined} />
         </label>
-        <button type="submit" className="button primary align-end" disabled={finish.isPending || !valid}>
+        <button type="submit" className="button primary" disabled={finish.isPending || !valid}>
           {valid ? d.finishTripKm(f.km(parsed - trip.start_km)) : d.finishTrip}
         </button>
       </div>

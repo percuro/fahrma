@@ -47,6 +47,7 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 - [How it calculates](docs/calculation.md): rates, splits, rounding, transfers, with an example
 - [Development](docs/development.md): running and testing from source
 - [Design notes](docs/design.md): why it works the way it does
+- [Design language](docs/design-language.md): the look, and the rules behind it
 
 ## Roadmap
 

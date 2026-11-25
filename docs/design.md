@@ -74,4 +74,4 @@ A subscription belongs to a login on a device: logging out ends it, and whoever 
 
 ## Accessibility
 
-Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting.
+Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting. On iPhone and iPad the text follows the system text size, because an installed web app has no browser zoom. The rules behind this, and the look of the app, are described in the [design language](design-language.md); an automatic WCAG 2.2 AA scan of the main pages runs with the end-to-end tests.
