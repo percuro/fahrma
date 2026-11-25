@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0-rc.1 – 2026-11-25
+
+Release candidate of 0.8.0, for trying the new look on real devices.
 
 A new look, and one design language shared with pomale.
 
