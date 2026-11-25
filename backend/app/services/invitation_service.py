@@ -34,8 +34,9 @@ from app.services.login_rate_limiter import LoginRateLimiter
 RESET_EXPIRY = timedelta(hours=24)
 # Used and expired links are kept a while for reference, then removed
 KEEP_FINISHED = timedelta(days=30)
-# Wrong tokens per IP address, like the login limit
+# Wrong tokens per IP address: 20 in 15 minutes (the limiter is keyed by the IP twice)
 invitation_rate_limiter = LoginRateLimiter()
+invitation_rate_limiter.account_limit = invitation_rate_limiter.ip_limit
 
 
 def invalid() -> AppError:
