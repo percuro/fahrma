@@ -20,6 +20,7 @@ from app.services.access import GroupContext
 from app.services.audit_service import record
 from app.services.auth_service import AuthService, utcnow
 from app.services.limits import check_new_group, check_new_member
+from app.services.placeholders import delete_orphans, new_placeholder
 
 
 def groups_of(db: Session, user: User) -> list[dict]:
@@ -45,6 +46,16 @@ def create_group(db: Session, user: User, name: str) -> Group:
 
 
 def group_read(ctx: GroupContext, today: date) -> dict:
+    now = utcnow()
+    open_links = {
+        row[0]: row[1]
+        for row in ctx.db.query(Invite.placeholder_user_id, Invite.expires_at).filter(
+            Invite.group_id == ctx.group.id,
+            Invite.placeholder_user_id.is_not(None),
+            Invite.used_at.is_(None),
+            Invite.expires_at > now,
+        )
+    }
     rows = (
         ctx.db.query(Membership, User)
         .join(User, User.id == Membership.user_id)
@@ -68,6 +79,8 @@ def group_read(ctx: GroupContext, today: date) -> dict:
                 "role": membership.role,
                 "active": membership.active,
                 "deleted": user.is_deleted,
+                "placeholder": user.placeholder,
+                "link_expires_at": open_links.get(user.id) if ctx.is_admin else None,
             }
             for membership, user in rows
         ],
@@ -110,7 +123,35 @@ def update_group(ctx: GroupContext, data: GroupUpdate) -> None:
     ctx.db.commit()
 
 
-def update_member(ctx: GroupContext, user_id: int, role: str | None, active: bool | None) -> None:
+def add_placeholder(ctx: GroupContext, display_name: str) -> int:
+    """A person without an account; the admins can send them a personal link later."""
+    ctx.require_admin()
+    check_new_member(ctx.db, ctx.group.id)
+    person = new_placeholder(ctx.db, display_name)
+    ctx.db.add(Membership(group_id=ctx.group.id, user_id=person.id))
+    record(ctx, "member", person.id, "create", {"display_name": person.display_name, "placeholder": True})
+    ctx.db.commit()
+    return person.id
+
+
+def count_admins(db: Session, group_id: int) -> int:
+    """Active admins who can act; placeholders cannot."""
+    return (
+        db.query(Membership)
+        .join(User, User.id == Membership.user_id)
+        .filter(
+            Membership.group_id == group_id,
+            Membership.role == ROLE_ADMIN,
+            Membership.active.is_(True),
+            User.placeholder.is_(False),
+        )
+        .count()
+    )
+
+
+def update_member(
+    ctx: GroupContext, user_id: int, role: str | None, active: bool | None, display_name: str | None = None
+) -> None:
     ctx.require_admin()
     membership = (
         ctx.db.query(Membership).filter(Membership.group_id == ctx.group.id, Membership.user_id == user_id).first()
@@ -119,33 +160,53 @@ def update_member(ctx: GroupContext, user_id: int, role: str | None, active: boo
         raise AppError(status.HTTP_404_NOT_FOUND, "member_not_found", "Member not found")
     if membership.user.is_deleted and (active or role == ROLE_ADMIN):
         raise AppError(status.HTTP_409_CONFLICT, "member_deleted", "This account has been deleted")
+    if display_name is not None and not membership.user.placeholder:
+        # People with an account choose their own name
+        raise AppError(status.HTTP_409_CONFLICT, "member_has_account", "Only names of people without an account")
     if active and not membership.active:
         check_new_member(ctx.db, ctx.group.id)
         check_new_group(ctx.db, user_id)
+    if display_name is not None:
+        membership.user.display_name = display_name.strip()
     if role is not None:
         membership.role = role
     if active is not None:
         membership.active = active
     ctx.db.flush()
-    admins = (
-        ctx.db.query(Membership)
-        .filter(
-            Membership.group_id == ctx.group.id,
-            Membership.role == ROLE_ADMIN,
-            Membership.active.is_(True),
-        )
-        .count()
-    )
-    if admins == 0:
+    if count_admins(ctx.db, ctx.group.id) == 0:
         ctx.db.rollback()
         raise AppError(status.HTTP_409_CONFLICT, "last_admin", "The group needs at least one admin")
-    record(ctx, "member", user_id, "update", {"role": role, "active": active})
+    changes = {"role": role, "active": active}
+    if display_name is not None:
+        changes["display_name"] = display_name.strip()
+    record(ctx, "member", user_id, "update", changes)
     ctx.db.commit()
 
 
-def create_invite(ctx: GroupContext) -> dict:
-    """One-time link into the group: PUBLIC_URL/invite#<token> (the token never reaches server logs)."""
+def placeholder_of(ctx: GroupContext, user_id: int) -> User:
+    """An active member without an account (for a personal link)."""
+    membership = (
+        ctx.db.query(Membership).filter(Membership.group_id == ctx.group.id, Membership.user_id == user_id).first()
+    )
+    if membership is None or not membership.user.placeholder:
+        raise AppError(status.HTTP_404_NOT_FOUND, "member_not_found", "Member not found")
+    if not membership.active:
+        raise AppError(status.HTTP_409_CONFLICT, "member_inactive", "Add the person to the group again first")
+    return membership.user
+
+
+def create_invite(ctx: GroupContext, placeholder_user_id: int | None = None, email: str | None = None) -> dict:
+    """One-time link into the group: PUBLIC_URL/invite#<token> (the token never reaches server logs).
+
+    With placeholder_user_id it is a personal link: whoever uses it becomes that member.
+    """
     ctx.require_admin()
+    if placeholder_user_id is not None:
+        placeholder_of(ctx, placeholder_user_id)
+        # Only the newest personal link of a person works
+        ctx.db.execute(
+            delete(Invite).where(Invite.placeholder_user_id == placeholder_user_id, Invite.used_at.is_(None))
+        )
     token = secrets.token_urlsafe(32)
     expires_at = utcnow() + timedelta(days=get_invite_expiry_days())
     invite = Invite(
@@ -153,10 +214,12 @@ def create_invite(ctx: GroupContext) -> dict:
         token_hash=AuthService.hash_token(token),
         created_by=ctx.user.id,
         expires_at=expires_at,
+        placeholder_user_id=placeholder_user_id,
+        email=email,
     )
     ctx.db.add(invite)
     ctx.db.flush()
-    record(ctx, "invite", invite.id, "create")
+    record(ctx, "invite", invite.id, "create", {"member": placeholder_user_id} if placeholder_user_id else None)
     ctx.db.commit()
     return {"url": f"{get_public_url()}/invite#{token}", "expires_at": expires_at}
 
@@ -169,6 +232,7 @@ def delete_group_data(db: Session, group_id: int) -> None:
     """
     trip_ids = select(Trip.id).where(Trip.group_id == group_id)
     settlement_ids = select(Settlement.id).where(Settlement.group_id == group_id)
+    member_ids = list(db.scalars(select(Membership.user_id).where(Membership.group_id == group_id)))
     db.execute(delete(Expense).where(Expense.group_id == group_id))
     db.execute(delete(FuelEntry).where(FuelEntry.group_id == group_id))
     db.execute(delete(TripShare).where(TripShare.trip_id.in_(trip_ids)))
@@ -181,6 +245,7 @@ def delete_group_data(db: Session, group_id: int) -> None:
     db.execute(delete(Invite).where(Invite.group_id == group_id))
     db.execute(delete(Membership).where(Membership.group_id == group_id))
     db.execute(delete(Group).where(Group.id == group_id))
+    delete_orphans(db, member_ids)
 
 
 def delete_group(ctx: GroupContext, confirm_name: str) -> None:

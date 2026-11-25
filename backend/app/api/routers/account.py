@@ -1,15 +1,16 @@
-"""The logged-in account: password, devices, data export, deletion."""
+"""The logged-in account: password, e-mail address, devices, data export, deletion."""
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_user
 from app.db.database import get_db
 from app.models.user import User
-from app.schemas.auth import DeletionPreview, PasswordChange, PasswordConfirmation, SessionRead
+from app.schemas.auth import DeletionPreview, EmailChange, PasswordChange, PasswordConfirmation, SessionRead
 from app.services.account_service import AccountService
 from app.services.auth_service import clear_session_cookie
+from app.services.invitation_service import InvitationService
 
 router = APIRouter()
 
@@ -21,6 +22,35 @@ def change_password(
     AccountService(db).change_password(
         user, data.current_password, data.new_password, request, request.state.session_id
     )
+
+
+@router.post("/email", status_code=status.HTTP_202_ACCEPTED)
+def change_email(
+    data: EmailChange,
+    request: Request,
+    background: BackgroundTasks,
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Sends a confirmation link to the new address; it replaces the old one once confirmed."""
+    AccountService(db).verify_password(user, data.password, request)
+    InvitationService(db, background).request_email_change(user, data.email, request)
+    return {"status": "accepted"}
+
+
+@router.delete("/email/pending", status_code=status.HTTP_204_NO_CONTENT)
+def cancel_email_change(user: User = Depends(require_user), db: Session = Depends(get_db)):
+    InvitationService(db).cancel_email_change(user)
+
+
+@router.delete("/email", status_code=status.HTTP_204_NO_CONTENT)
+def remove_email(
+    data: PasswordConfirmation, request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)
+):
+    """Without an address there is no "forgot password" by mail for this account."""
+    AccountService(db).verify_password(user, data.password, request)
+    user.email = None
+    db.commit()
 
 
 @router.get("/sessions", response_model=list[SessionRead])

@@ -24,12 +24,14 @@ class AdminService:
                 select(Membership.user_id, func.count()).where(Membership.active.is_(True)).group_by(Membership.user_id)
             ).all()
         )
-        users = self.db.scalars(select(User).where(User.deleted_at.is_(None)).order_by(User.username))
+        users = self.db.scalars(
+            select(User).where(User.deleted_at.is_(None), User.placeholder.is_(False)).order_by(User.username)
+        )
         return [self._read(user, counts.get(user.id, 0)) for user in users]
 
     def get_user(self, user_id: int) -> User:
         user = self.db.get(User, user_id)
-        if user is None or user.is_deleted:
+        if user is None or user.is_deleted or user.placeholder:
             raise AppError(status.HTTP_404_NOT_FOUND, "account_not_found", "Account not found")
         return user
 
@@ -75,6 +77,7 @@ class AdminService:
             id=user.id,
             username=user.username,
             display_name=user.display_name,
+            email=user.email,
             role=user.role,
             is_active=user.is_active,
             created_at=user.created_at,

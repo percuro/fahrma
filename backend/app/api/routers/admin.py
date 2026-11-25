@@ -1,13 +1,13 @@
 """Instance administration (users with the role admin)."""
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_admin
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.admin import AdminUserRead, AdminUserUpdate
-from app.schemas.invitation import InvitationCreate, InvitationCreated, InvitationRead
+from app.schemas.invitation import InvitationCreate, InvitationCreated, InvitationRead, PasswordResetCreate
 from app.services.admin_service import AdminService
 from app.services.invitation_service import InvitationService
 
@@ -32,15 +32,32 @@ def delete_user(user_id: int, admin: User = Depends(require_admin), db: Session 
 
 
 @router.post("/users/{user_id}/password-reset", response_model=InvitationCreated, status_code=status.HTTP_201_CREATED)
-def create_password_reset(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    """A one-time link with which the person sets a new password. Admins never see or set passwords."""
+def create_password_reset(
+    user_id: int,
+    request: Request,
+    background: BackgroundTasks,
+    data: PasswordResetCreate | None = None,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    """A one-time link with which the person sets a new password. Admins never see or set passwords.
+
+    With send_email the link also goes to the account's confirmed address.
+    """
     target = AdminService(db).get_user(user_id)
-    return InvitationService(db).create_password_reset(admin, target)
+    send = bool(data and data.send_email)
+    return InvitationService(db, background).create_password_reset(admin, target, send_email=send, request=request)
 
 
 @router.post("/invitations", response_model=InvitationCreated, status_code=status.HTTP_201_CREATED)
-def create_invitation(data: InvitationCreate, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
-    return InvitationService(db).create_signup(admin, data.role, data.note)
+def create_invitation(
+    data: InvitationCreate,
+    request: Request,
+    background: BackgroundTasks,
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+):
+    return InvitationService(db, background).create_signup(admin, data.role, data.note, data.email, request)
 
 
 @router.get("/invitations", response_model=list[InvitationRead])

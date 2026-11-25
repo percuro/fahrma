@@ -1,6 +1,6 @@
 """Public: whoever has a link may use it once. The token travels in the body, never in the URL."""
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import optional_user
@@ -22,8 +22,10 @@ def accept_invitation(
     data: InvitationAccept,
     request: Request,
     response: Response,
+    background: BackgroundTasks,
     user: User | None = Depends(optional_user),
     db: Session = Depends(get_db),
 ):
-    """Group link: joins with the logged-in account, or creates one. Admin links: signup or new password."""
-    return InvitationService(db).accept(data, request, response, user)
+    """Group link: joins with the logged-in account, or creates one. Other links: signup, new password,
+    confirming an e-mail address, finishing a registration."""
+    return InvitationService(db, background).accept(data, request, response, user)

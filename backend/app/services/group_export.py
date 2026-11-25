@@ -2,7 +2,8 @@
 
 The format "fahrma-group/1" contains every row of the group, with the database IDs, so a
 later version can import it into another instance (moving between self-hosting and a
-hosted service). Account data is limited to what the group sees: ID and display name.
+hosted service; see group_import.py). Account data is limited to what the group sees:
+ID and display name.
 """
 
 import json
@@ -18,11 +19,10 @@ from app.models.group import Membership
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
+from app.schemas.group_import import FORMAT
 from app.services.access import GroupContext
 from app.services.auth_service import utcnow
 from app.services.rows import row_dict
-
-FORMAT = "fahrma-group/1"
 
 
 def export_group(ctx: GroupContext) -> dict:
@@ -59,6 +59,7 @@ def export_group(ctx: GroupContext) -> dict:
                 "role": membership.role,
                 "active": membership.active,
                 "deleted": user.is_deleted,
+                "placeholder": user.placeholder,
                 "joined_at": membership.created_at.isoformat(),
             }
             for membership, user in members

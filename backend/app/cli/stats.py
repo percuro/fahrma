@@ -26,7 +26,7 @@ def _count(db: Session, query) -> int:
 
 def collect(db: Session) -> dict:
     now = utcnow()
-    accounts = select(func.count()).select_from(User).where(User.deleted_at.is_(None))
+    accounts = select(func.count()).select_from(User).where(User.deleted_at.is_(None), User.placeholder.is_(False))
     months: dict[str, int] = {}
     for model in (Trip, FuelEntry, Expense):
         month = func.strftime("%Y-%m", model.created_at)
@@ -39,6 +39,7 @@ def collect(db: Session) -> dict:
         "accounts_active": _count(db, accounts.where(User.is_active.is_(True))),
         "accounts_seen_30_days": _count(db, accounts.where(User.last_seen_at >= now - timedelta(days=30))),
         "admins": _count(db, accounts.where(User.role == "admin", User.is_active.is_(True))),
+        "people_without_account": _count(db, select(func.count()).select_from(User).where(User.placeholder.is_(True))),
         "accounts_deleted": _count(db, select(func.count()).select_from(User).where(User.deleted_at.is_not(None))),
         "groups": _count(db, select(func.count()).select_from(Group)),
         "memberships_active": _count(
