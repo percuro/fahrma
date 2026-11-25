@@ -4,7 +4,7 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.7 – reservation calendar and reminders on the phone. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
+> Status: 0.8 – a new look, with a design language shared with pomale. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
@@ -47,11 +47,16 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 - [How it calculates](docs/calculation.md): rates, splits, rounding, transfers, with an example
 - [Development](docs/development.md): running and testing from source
 - [Design notes](docs/design.md): why it works the way it does
+- [Design language](docs/design-language.md): the look, and the rules behind it
 
 ## Roadmap
 
-- **0.8** login via OpenID Connect
-- **0.9** receipt photos, beta hardening; **1.0** stable API and configuration
+- **0.9** login via OpenID Connect
+- **0.10** receipt photos, beta hardening; **1.0** stable API and configuration
+
+## Sibling project
+
+[pomale](https://github.com/percuro/pomale) is a habit tracker by the same author: hosted the same way, under the same license, and built with the same [design language](docs/design-language.md) in a different character.
 
 ## License
 

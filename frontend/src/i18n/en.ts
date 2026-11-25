@@ -190,8 +190,9 @@ export const en: Messages = {
     recentTrips: 'Recent trips',
     noTrips: 'No trips yet.',
     allEntries: 'All entries',
-    onTheRoad: (car: string, driver: string, date: string, km: string) =>
-      `${car} is on the road (${driver}, since ${date}, from ${km})`,
+    running: 'running',
+    carOnTheRoad: (car: string) => `${car} is on the road`,
+    startedBy: (driver: string, date: string) => `${driver}, since ${date} · odometer at departure`,
     odometerNow: 'Odometer now',
     finishTrip: 'Finish trip',
     finishTripKm: (km: string) => `Finish trip (${km})`,

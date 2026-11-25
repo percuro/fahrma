@@ -196,8 +196,9 @@ export const de = {
     recentTrips: 'Letzte Fahrten',
     noTrips: 'Noch keine Fahrten.',
     allEntries: 'Alle Einträge',
-    onTheRoad: (car: string, driver: string, date: string, km: string) =>
-      `${car} ist unterwegs (${driver}, seit ${date}, ab ${km})`,
+    running: 'läuft',
+    carOnTheRoad: (car: string) => `${car} ist unterwegs`,
+    startedBy: (driver: string, date: string) => `${driver}, seit ${date} · km-Stand bei Abfahrt`,
     odometerNow: 'km-Stand jetzt',
     finishTrip: 'Fahrt beenden',
     finishTripKm: (km: string) => `Fahrt beenden (${km})`,

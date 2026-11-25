@@ -4,7 +4,9 @@
  */
 export const APP_NAME = 'fahrma';
 export const APP_SHORT_NAME = 'fahrma';
-export const THEME_COLOR = '#1f5f8b';
-// Browser UI colour in dark mode (matches --surface in index.css)
-export const THEME_COLOR_DARK = '#1a2028';
-export const BACKGROUND_COLOR = '#f5f6f8';
+// Colour of the browser and system bars: the top bar, which is the same in the light
+// and in the dark scheme (--chrome in styles/theme.css)
+export const THEME_COLOR = '#14263a';
+export const THEME_COLOR_DARK = '#14263a';
+// Window colour before the styles have loaded (--bg in styles/theme.css)
+export const BACKGROUND_COLOR = '#f2f4f7';

@@ -5,7 +5,7 @@ import { useCars, useGroup, useGroupId, useMemberNames, useReservations } from '
 import { useFormat } from '../hooks/useFormat';
 import { useT } from '../i18n';
 import { queryState } from '../components/queryState';
-import { CalendarIcon } from '../components/Icons';
+import { CalendarIcon, ChevronLeftIcon, ChevronRightIcon } from '../components/Icons';
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -49,7 +49,7 @@ function Calendar({ group, cars }: { group: Group; cars: Car[] }) {
   return (
     <>
       <h1>{r.calendar}</h1>
-      <div className="actions">
+      <div className="button-row mt-0 mb-075">
         <Link className="button primary" to={newLink}><CalendarIcon />{r.reserve}</Link>
       </div>
       {activeCars.length > 1 && (
@@ -64,9 +64,9 @@ function Calendar({ group, cars }: { group: Group; cars: Car[] }) {
         </div>
       )}
       <div className="week-nav">
-        <button type="button" className="button small" onClick={() => choose({ week: addDays(week, -7) })} aria-label={r.previousWeek}>‹</button>
+        <button type="button" className="button icon" onClick={() => choose({ week: addDays(week, -7) })} aria-label={r.previousWeek}><ChevronLeftIcon /></button>
         <strong aria-live="polite">{r.weekOf(f.weekday(week), f.weekday(last))}</strong>
-        <button type="button" className="button small" onClick={() => choose({ week: addDays(week, 7) })} aria-label={r.nextWeek}>›</button>
+        <button type="button" className="button icon" onClick={() => choose({ week: addDays(week, 7) })} aria-label={r.nextWeek}><ChevronRightIcon /></button>
         {week !== weekStart(today) && (
           <button type="button" className="button small" onClick={() => choose({ week: today })}>{r.thisWeek}</button>
         )}

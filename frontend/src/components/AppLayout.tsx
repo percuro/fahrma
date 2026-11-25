@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Me } from '../lib/types';
@@ -16,6 +16,7 @@ import { clearCache } from '../lib/offline-cache';
 import { removeUserDrafts } from '../lib/outbox';
 import { unsubscribeLocally } from '../lib/push';
 import { CalendarIcon, HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
+import { BrandMark } from './BrandMark';
 
 export function AppLayout() {
   const me = useMe();
@@ -85,34 +86,68 @@ function SignedIn({ me }: { me: Me }) {
   const { groupId } = useParams();
   const gid = groupId ? Number(groupId) : null;
   const inGroup = gid !== null && isValidGroupId(gid);
+  useDocumentTitle();
 
   return (
     <SessionContext.Provider value={me}>
       <a className="skip-link" href="#content">{t.nav.skip}</a>
-      <UpdateBanner />
-      <OfflineBanner />
-      <OfflineSync />
       <header className="topbar">
-        <NavLink to="/" className="brand">{APP_NAME}</NavLink>
+        <NavLink to="/" className="brand"><BrandMark />{APP_NAME}</NavLink>
         {inGroup && (
-          <nav className="bottomnav" aria-label={t.nav.areas}>
-            <NavLink to={`/g/${gid}`} end><HomeIcon />{t.nav.overview}</NavLink>
-            <NavLink to={`/g/${gid}/calendar`}><CalendarIcon />{t.nav.calendar}</NavLink>
-            <NavLink to={`/g/${gid}/history`}><ListIcon />{t.nav.history}</NavLink>
-            <NavLink to={`/g/${gid}/settlement`}><ScaleIcon />{t.nav.settlement}</NavLink>
-            <NavLink to={`/g/${gid}/group`}><UsersIcon />{t.nav.group}</NavLink>
+          <nav className="appnav" aria-label={t.nav.areas}>
+            <NavItem to={`/g/${gid}`} end icon={<HomeIcon />}>{t.nav.overview}</NavItem>
+            <NavItem to={`/g/${gid}/calendar`} icon={<CalendarIcon />}>{t.nav.calendar}</NavItem>
+            <NavItem to={`/g/${gid}/history`} icon={<ListIcon />}>{t.nav.history}</NavItem>
+            <NavItem to={`/g/${gid}/settlement`} icon={<ScaleIcon />}>{t.nav.settlement}</NavItem>
+            <NavItem to={`/g/${gid}/group`} icon={<UsersIcon />}>{t.nav.group}</NavItem>
           </nav>
         )}
         <span className="spacer" />
-        <NavLink to="/profile" className="icon-link" aria-label={t.nav.profile}>
+        <NavLink to="/profile" className="icon-button" aria-label={t.nav.profile}>
           <UserIcon />
         </NavLink>
       </header>
+      <UpdateBanner />
+      <OfflineBanner />
+      <OfflineSync />
       <main id="content" className="content">
         <Outlet />
       </main>
     </SessionContext.Provider>
   );
+}
+
+/** One place of the navigation: icon and a short word; the active one gets the highlight. */
+function NavItem({ to, end, icon, children }: { to: string; end?: boolean; icon: ReactNode; children: ReactNode }) {
+  return (
+    <NavLink to={to} end={end}>
+      <span className="nav-icon">{icon}</span>
+      <span className="nav-label">{children}</span>
+    </NavLink>
+  );
+}
+
+/**
+ * The window title follows the heading of the page ("Trip · fahrma"): an installed
+ * app shows it in its window and in the task switcher, a browser in its tab.
+ */
+function useDocumentTitle() {
+  useEffect(() => {
+    const main = document.getElementById('content');
+    if (!main) return;
+    const update = () => {
+      const heading = main.querySelector('h1')?.textContent?.trim();
+      const title = heading ? `${heading} · ${APP_NAME}` : APP_NAME;
+      if (document.title !== title) document.title = title;
+    };
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(main, { childList: true, subtree: true, characterData: true });
+    return () => {
+      observer.disconnect();
+      document.title = APP_NAME;
+    };
+  }, []);
 }
 
 /** Offers a reload when the service worker has a new version (see main.tsx). */
@@ -126,7 +161,7 @@ function UpdateBanner() {
   }, []);
   if (!available) return null;
   return (
-    <div className="update-banner" role="status">
+    <div className="banner" role="status">
       <span>{t.app.updateAvailable}</span>
       <button type="button" className="button small primary" onClick={() => window.dispatchEvent(new Event('carshare:apply-update'))}>
         {t.app.reload}
