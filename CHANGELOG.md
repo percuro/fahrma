@@ -1,8 +1,6 @@
 # Changelog
 
-## 0.8.0-rc.1 – 2026-11-25
-
-Release candidate of 0.8.0, for trying the new look on real devices.
+## 0.8.0 – 2026-11-25
 
 A new look, and one design language shared with pomale.
 
@@ -13,6 +11,11 @@ A new look, and one design language shared with pomale.
 - On iPhone and iPad the text follows the system text size. The window title names the page ("New trip · fahrma").
 - Styles are split into five layers (`frontend/src/styles/`), with one set of colour roles and components shared with pomale, see the [design language](docs/design-language.md). A test checks 40 colour pairs against the WCAG contrast minimum in both schemes; the end-to-end tests scan the main pages for WCAG 2.2 AA violations and for sideways scrolling at 320 px.
 - Fixed: the link to a car's statistics on the overview had a name for screen readers that did not contain its visible text.
+- Icons carry a version in their address (`/icon.svg?v=…`), so that browsers fetch a changed icon instead of showing the cached one for a week. Bookmarks pick up the new icon the next time the page is opened; some browsers only do so after the bookmark is added again.
+
+### Upgrade notes
+
+- No migration and no new settings. The roadmap moves by one version: login via OpenID Connect is planned for 0.9.
 
 ## 0.7.0 – 2026-11-25
 
