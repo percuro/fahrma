@@ -4,10 +4,19 @@ import { errorText } from '../lib/api';
 import { parseKm, parseMoney } from '../lib/format';
 import type { Car, Group, Share, Trip, TripWrite } from '../lib/types';
 import { draftLastKm, findDraft, type Draft } from '../lib/outbox';
-import { todayIn } from '../lib/dates';
+import { nowIn, todayIn } from '../lib/dates';
 import { useDrafts, useEntrySave } from '../hooks/useDrafts';
 import { DiscardDraftButton, DraftNotice } from '../components/DraftNotice';
-import { useCars, useGroup, useGroupId, useGroupMutation, useTrip, useTrips } from '../hooks/useGroupData';
+import {
+  useCars,
+  useGroup,
+  useGroupId,
+  useGroupMutation,
+  useMemberNames,
+  useReservations,
+  useTrip,
+  useTrips,
+} from '../hooks/useGroupData';
 import { defaultCarId } from '../lib/cars';
 import { useSession } from '../hooks/useSession';
 import { useFormat } from '../hooks/useFormat';
@@ -132,6 +141,7 @@ function TripForm({ group, cars, trip, recentTrips, draft }: {
   return (
     <>
       <h1>{editing ? t.trip.title : t.trip.newTitle}</h1>
+      {!editing && carId !== null && <ReservedNow group={group} carId={carId} shares={shares} />}
       {draft && <DraftNotice draft={draft} />}
       {readOnly && <div className="notice">{t.trip.settledNotice}</div>}
       <form className="form" onSubmit={submit} aria-describedby={error ? 'trip-error' : undefined}>
@@ -179,4 +189,24 @@ function TripForm({ group, cars, trip, recentTrips, draft }: {
       </form>
     </>
   );
+}
+
+/** A trip does not need a reservation, but whoever starts one should know when someone else has the car booked. */
+function ReservedNow({ group, carId, shares }: { group: Group; carId: number; shares: Share[] }) {
+  const t = useT();
+  const f = useFormat();
+  const name = useMemberNames();
+  // Without a connection there is simply no hint; the trip works as before
+  const reservations = useReservations();
+  const now = nowIn(group.effective_timezone);
+  const other = reservations.data?.find(
+    (x) =>
+      x.car_id === carId &&
+      x.starts_at.slice(0, 16) <= now &&
+      now < x.ends_at.slice(0, 16) &&
+      !shares.some((s) => s.user_id === x.user_id),
+  );
+  if (!other) return null;
+  const until = other.ends_at.slice(0, 10) === now.slice(0, 10) ? f.time(other.ends_at) : f.dateTime(other.ends_at);
+  return <div className="notice" role="status">{t.reservation.reservedNow(name(other.user_id), until)}</div>;
 }

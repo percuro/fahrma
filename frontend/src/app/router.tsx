@@ -12,6 +12,8 @@ import { SettlementPage } from '../pages/SettlementPage';
 import { SettlementDetailPage } from '../pages/SettlementDetailPage';
 import { GroupPage } from '../pages/GroupPage';
 import { StatsPage } from '../pages/StatsPage';
+import { CalendarPage } from '../pages/CalendarPage';
+import { ReservationFormPage } from '../pages/ReservationFormPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { AdminPage } from '../pages/AdminPage';
@@ -50,6 +52,9 @@ export const router = createBrowserRouter([
       { path: 'g/:groupId/settlement/:settlementId', element: <SettlementDetailPage /> },
       { path: 'g/:groupId/group', element: <GroupPage /> },
       { path: 'g/:groupId/stats', element: <StatsPage /> },
+      { path: 'g/:groupId/calendar', element: <CalendarPage /> },
+      { path: 'g/:groupId/reservation/new', element: <ReservationFormPage /> },
+      { path: 'g/:groupId/reservation/:reservationId', element: <ReservationFormPage /> },
       ...legacy,
       { path: '*', element: <Navigate to="/" replace /> },
     ],

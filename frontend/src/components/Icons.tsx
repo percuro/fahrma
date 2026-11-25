@@ -36,3 +36,6 @@ export const BoltIcon = () => (
 export const UserIcon = () => (
   <svg {...base}><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
 );
+export const CalendarIcon = () => (
+  <svg {...base}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4" /></svg>
+);

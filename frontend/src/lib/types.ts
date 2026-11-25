@@ -328,3 +328,24 @@ export interface CarStats {
   /** Months of the year ("2026-03"), or the years ("2026") */
   periods: { period: string; km: number; fuel_cents: number; expense_cents: number }[];
 }
+
+/** Times are wall-clock times in the group's time zone ("2026-12-01T08:00:00"), plus the same moments in UTC. */
+export interface Reservation {
+  id: number;
+  car_id: number;
+  user_id: number;
+  starts_at: string;
+  ends_at: string;
+  starts_at_utc: string;
+  ends_at_utc: string;
+  note: string | null;
+  created_by: number;
+}
+
+export interface ReservationWrite {
+  car_id: number;
+  user_id: number;
+  starts_at: string;
+  ends_at: string;
+  note: string | null;
+}

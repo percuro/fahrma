@@ -9,6 +9,7 @@ import type {
   Expense,
   Fuel,
   Group,
+  Reservation,
   Settlement,
   SettlementBrief,
   Transfer,
@@ -60,6 +61,12 @@ export const useFuelEntry = (id: number | null) => useGroupQuery<Fuel>(`/fuel/${
 export const useExpense = (id: number | null) => useGroupQuery<Expense>(`/expenses/${id}`, id !== null);
 export const useCarStats = (carId: number | null, year: number | null) =>
   useGroupQuery<CarStats>(`/cars/${carId}/stats${year ? `?year=${year}` : ''}`, carId !== null);
+/** Reservations overlapping the local days from..to (default: today and the next 13 days). */
+export function useReservations(range?: { from: string; to: string }, carId?: number | null) {
+  const query = new URLSearchParams({ ...(range ?? {}), ...(carId ? { car_id: String(carId) } : {}) }).toString();
+  return useGroupQuery<Reservation[]>(`/reservations${query ? `?${query}` : ''}`);
+}
+export const useReservation = (id: number | null) => useGroupQuery<Reservation>(`/reservations/${id}`, id !== null);
 export const useBalance = (periodEnd?: string) =>
   useGroupQuery<Balance>(`/balance${periodEnd ? `?period_end=${periodEnd}` : ''}`);
 
