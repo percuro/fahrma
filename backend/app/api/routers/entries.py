@@ -16,6 +16,7 @@ from app.schemas.entries import (
 )
 from app.services import balance_service, entry_service
 from app.services.access import GroupContext
+from app.services.idempotency import idempotency_key
 
 trips_router = APIRouter()
 fuel_router = APIRouter()
@@ -68,8 +69,13 @@ def read_trip(trip_id: int, ctx: GroupContext = Depends(require_member), today: 
 
 
 @trips_router.post("", response_model=TripRead, status_code=status.HTTP_201_CREATED)
-def create_trip(data: TripWrite, ctx: GroupContext = Depends(require_member), today: date = Depends(get_group_today)):
-    return _trip_reads(ctx, [entry_service.create_trip(ctx, data)], today)[0]
+def create_trip(
+    data: TripWrite,
+    ctx: GroupContext = Depends(require_member),
+    today: date = Depends(get_group_today),
+    key: str | None = Depends(idempotency_key),
+):
+    return _trip_reads(ctx, [entry_service.create_trip(ctx, data, key)], today)[0]
 
 
 @trips_router.put("/{trip_id}", response_model=TripRead)
@@ -81,9 +87,13 @@ def update_trip(
 
 @trips_router.post("/{trip_id}/finish", response_model=TripRead)
 def finish_trip(
-    trip_id: int, data: TripFinish, ctx: GroupContext = Depends(require_member), today: date = Depends(get_group_today)
+    trip_id: int,
+    data: TripFinish,
+    ctx: GroupContext = Depends(require_member),
+    today: date = Depends(get_group_today),
+    key: str | None = Depends(idempotency_key),
 ):
-    return _trip_reads(ctx, [entry_service.finish_trip(ctx, trip_id, data.end_km)], today)[0]
+    return _trip_reads(ctx, [entry_service.finish_trip(ctx, trip_id, data.end_km, key)], today)[0]
 
 
 @trips_router.delete("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -106,8 +116,10 @@ def read_fuel(fuel_id: int, ctx: GroupContext = Depends(require_member)):
 
 
 @fuel_router.post("", response_model=FuelRead, status_code=status.HTTP_201_CREATED)
-def create_fuel(data: FuelWrite, ctx: GroupContext = Depends(require_member)):
-    return _fuel_read(entry_service.create_fuel(ctx, data))
+def create_fuel(
+    data: FuelWrite, ctx: GroupContext = Depends(require_member), key: str | None = Depends(idempotency_key)
+):
+    return _fuel_read(entry_service.create_fuel(ctx, data, key))
 
 
 @fuel_router.put("/{fuel_id}", response_model=FuelRead)
@@ -135,8 +147,10 @@ def read_expense(expense_id: int, ctx: GroupContext = Depends(require_member)):
 
 
 @expenses_router.post("", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
-def create_expense(data: ExpenseWrite, ctx: GroupContext = Depends(require_member)):
-    return _expense_read(entry_service.create_expense(ctx, data))
+def create_expense(
+    data: ExpenseWrite, ctx: GroupContext = Depends(require_member), key: str | None = Depends(idempotency_key)
+):
+    return _expense_read(entry_service.create_expense(ctx, data, key))
 
 
 @expenses_router.put("/{expense_id}", response_model=ExpenseRead)

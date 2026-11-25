@@ -8,6 +8,7 @@ from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.schemas.entries import ExpenseWrite, FuelWrite, TripWrite
+from app.services import idempotency
 from app.services.access import GroupContext
 from app.services.audit_service import record
 from app.services.car_service import get_car
@@ -98,15 +99,16 @@ def _apply_trip(ctx: GroupContext, trip: Trip, data: TripWrite) -> None:
     ]
 
 
-def create_trip(ctx: GroupContext, data: TripWrite) -> Trip:
+def create_trip(ctx: GroupContext, data: TripWrite, key: str | None = None) -> Trip:
+    if (earlier := idempotency.previous(ctx, key, "trip")) is not None:
+        return idempotency.load(ctx, earlier, get_trip)
     _check_km(ctx, data.car_id, data.start_km, data.end_km, None)
     trip = Trip(group_id=ctx.group.id, created_by=ctx.user.id)
     _apply_trip(ctx, trip, data)
     ctx.db.add(trip)
     ctx.db.flush()
     record(ctx, "trip", trip.id, "create", data.model_dump())
-    ctx.db.commit()
-    return get_trip(ctx, trip.id)
+    return get_trip(ctx, idempotency.commit(ctx, key, "trip", trip.id))
 
 
 def update_trip(ctx: GroupContext, trip_id: int, data: TripWrite) -> Trip:
@@ -119,7 +121,9 @@ def update_trip(ctx: GroupContext, trip_id: int, data: TripWrite) -> Trip:
     return get_trip(ctx, trip.id)
 
 
-def finish_trip(ctx: GroupContext, trip_id: int, end_km: int) -> Trip:
+def finish_trip(ctx: GroupContext, trip_id: int, end_km: int, key: str | None = None) -> Trip:
+    if (earlier := idempotency.previous(ctx, key, "finish")) is not None:
+        return idempotency.load(ctx, earlier, get_trip)
     trip = get_trip(ctx, trip_id)
     _not_settled(trip)
     if trip.end_km is not None:
@@ -127,8 +131,7 @@ def finish_trip(ctx: GroupContext, trip_id: int, end_km: int) -> Trip:
     _check_km(ctx, trip.car_id, trip.start_km, end_km, trip.id)
     trip.end_km = end_km
     record(ctx, "trip", trip.id, "finish", {"end_km": end_km})
-    ctx.db.commit()
-    return get_trip(ctx, trip.id)
+    return get_trip(ctx, idempotency.commit(ctx, key, "finish", trip.id))
 
 
 def delete_trip(ctx: GroupContext, trip_id: int) -> None:
@@ -169,14 +172,15 @@ def _apply_fuel(ctx: GroupContext, entry: FuelEntry, data: FuelWrite) -> None:
         setattr(entry, key, value)
 
 
-def create_fuel(ctx: GroupContext, data: FuelWrite) -> FuelEntry:
+def create_fuel(ctx: GroupContext, data: FuelWrite, key: str | None = None) -> FuelEntry:
+    if (earlier := idempotency.previous(ctx, key, "fuel")) is not None:
+        return idempotency.load(ctx, earlier, get_fuel)
     entry = FuelEntry(group_id=ctx.group.id, created_by=ctx.user.id)
     _apply_fuel(ctx, entry, data)
     ctx.db.add(entry)
     ctx.db.flush()
     record(ctx, "fuel", entry.id, "create", data.model_dump())
-    ctx.db.commit()
-    return entry
+    return get_fuel(ctx, idempotency.commit(ctx, key, "fuel", entry.id))
 
 
 def update_fuel(ctx: GroupContext, fuel_id: int, data: FuelWrite) -> FuelEntry:
@@ -239,14 +243,15 @@ def _apply_expense(ctx: GroupContext, entry: Expense, data: ExpenseWrite) -> Non
         setattr(entry, key, value)
 
 
-def create_expense(ctx: GroupContext, data: ExpenseWrite) -> Expense:
+def create_expense(ctx: GroupContext, data: ExpenseWrite, key: str | None = None) -> Expense:
+    if (earlier := idempotency.previous(ctx, key, "expense")) is not None:
+        return idempotency.load(ctx, earlier, get_expense)
     entry = Expense(group_id=ctx.group.id, created_by=ctx.user.id)
     _apply_expense(ctx, entry, data)
     ctx.db.add(entry)
     ctx.db.flush()
     record(ctx, "expense", entry.id, "create", data.model_dump())
-    ctx.db.commit()
-    return entry
+    return get_expense(ctx, idempotency.commit(ctx, key, "expense", entry.id))
 
 
 def update_expense(ctx: GroupContext, expense_id: int, data: ExpenseWrite) -> Expense:
