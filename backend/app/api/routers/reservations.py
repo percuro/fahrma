@@ -1,11 +1,11 @@
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
 from app.api.dependencies.clock import Clock, get_clock, get_group_today
 from app.api.dependencies.group import require_member
 from app.schemas.reservation import ReservationRead, ReservationWrite
-from app.services import reservation_service
+from app.services import notification_service, reservation_service
 from app.services.access import GroupContext
 
 router = APIRouter()
@@ -27,9 +27,14 @@ def list_reservations(
 
 @router.post("", response_model=ReservationRead, status_code=status.HTTP_201_CREATED)
 def create_reservation(
-    data: ReservationWrite, ctx: GroupContext = Depends(require_member), clock: Clock = Depends(get_clock)
+    data: ReservationWrite,
+    background: BackgroundTasks,
+    ctx: GroupContext = Depends(require_member),
+    clock: Clock = Depends(get_clock),
 ):
     reservation = reservation_service.create_reservation(ctx, data, clock.now())
+    items = notification_service.reservation_items(ctx, reservation, "create", clock.now())
+    notification_service.deliver_later(background, ctx.db, items)
     return reservation_service.reservation_read(reservation, reservation_service.group_zone(ctx))
 
 
@@ -42,16 +47,28 @@ def read_reservation(reservation_id: int, ctx: GroupContext = Depends(require_me
 def update_reservation(
     reservation_id: int,
     data: ReservationWrite,
+    background: BackgroundTasks,
     ctx: GroupContext = Depends(require_member),
     clock: Clock = Depends(get_clock),
 ):
+    previous_user_id = reservation_service.get_reservation(ctx, reservation_id).user_id
     reservation = reservation_service.update_reservation(ctx, reservation_id, data, clock.now())
+    items = notification_service.reservation_items(ctx, reservation, "update", clock.now(), previous_user_id)
+    notification_service.deliver_later(background, ctx.db, items)
     return reservation_service.reservation_read(reservation, reservation_service.group_zone(ctx))
 
 
 @router.delete("/{reservation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_reservation(
-    reservation_id: int, ctx: GroupContext = Depends(require_member), clock: Clock = Depends(get_clock)
+    reservation_id: int,
+    background: BackgroundTasks,
+    ctx: GroupContext = Depends(require_member),
+    clock: Clock = Depends(get_clock),
 ):
+    # The message is prepared before the row is gone; it only goes out if deleting worked
+    reservation = reservation_service.get_reservation(ctx, reservation_id)
+    reservation_service.check_changeable(ctx, reservation, clock.now())
+    items = notification_service.reservation_items(ctx, reservation, "delete", clock.now())
     reservation_service.delete_reservation(ctx, reservation_id, clock.now())
+    notification_service.deliver_later(background, ctx.db, items)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

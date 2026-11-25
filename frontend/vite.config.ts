@@ -62,6 +62,8 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // Web Push handlers (public/push-sw.js); the offline part above stays generated
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

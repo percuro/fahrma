@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
 import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
@@ -135,4 +136,39 @@ export async function nextMail(address: string, seen = 0): Promise<Mail> {
 
 export function uniqueEmail(): string {
   return `${uniqueUsername()}@example.org`;
+}
+
+/**
+ * Push notifications of the instance, written as JSON files when it runs with PUSH_DIR.
+ * E2E_PUSH_DIR is that directory as seen from the tests; without it, those tests are skipped.
+ */
+export const PUSH_DIR = process.env.E2E_PUSH_DIR;
+
+export interface PushMessage {
+  endpoint: string;
+  title: string;
+  body: string;
+  url: string;
+  tag: string;
+}
+
+export function pushesTo(endpoint: string): PushMessage[] {
+  if (!PUSH_DIR) return [];
+  return readdirSync(PUSH_DIR)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => JSON.parse(readFileSync(join(PUSH_DIR, name), 'utf8')) as PushMessage)
+    .filter((message) => message.endpoint === endpoint);
+}
+
+/** What a browser hands to the server when subscribing, with keys that encrypt correctly. */
+export function fakePushSubscription(name: string) {
+  const { publicKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const jwk = publicKey.export({ format: 'jwk' });
+  const point = Buffer.concat([Buffer.from([4]), Buffer.from(jwk.x!, 'base64url'), Buffer.from(jwk.y!, 'base64url')]);
+  return {
+    endpoint: `https://fcm.googleapis.com/fcm/send/e2e-${name}-${Date.now().toString(36)}`,
+    keys: { p256dh: point.toString('base64url'), auth: randomBytes(16).toString('base64url') },
+    locale: 'de',
+  };
 }

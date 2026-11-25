@@ -14,6 +14,7 @@ import { Loading } from './Status';
 import { OfflineBanner, OfflineSync } from './OfflineSync';
 import { clearCache } from '../lib/offline-cache';
 import { removeUserDrafts } from '../lib/outbox';
+import { unsubscribeLocally } from '../lib/push';
 import { CalendarIcon, HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
 
 export function AppLayout() {
@@ -35,7 +36,10 @@ export function AppLayout() {
       setLastMe(null);
       if (lastUserId.current !== null) removeUserDrafts(lastUserId.current);
       clearCache();
+      // The server ended this device's subscription with the login
+      void unsubscribeLocally();
       queryClient.removeQueries({ queryKey: ['group'] });
+      queryClient.removeQueries({ queryKey: ['notifications'] });
     };
     window.addEventListener('carshare:unauthorized', onUnauthorized);
     window.addEventListener('carshare:logout', onLogout);

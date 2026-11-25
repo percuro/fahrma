@@ -66,6 +66,12 @@ Times are wall-clock times in the group's time zone, because that is how people 
 
 The person a reservation is for, whoever entered it and the group admins can change or cancel it until it is over. Leaving a group or deleting the account cancels upcoming reservations; past ones stay as part of the change log.
 
+## Reminders without an app store
+
+A reminder is what makes a reservation useful: an hour before, the phone says the car is yours. Web Push delivers that to installed web apps on Android, desktops and, since iOS 16.4, iPhones, so it needs no native app either. The instance signs its messages with its own key (VAPID) and encrypts each one for the device, so neither an account with Google or Apple nor any configuration is needed, and the push services only pass on what they cannot read.
+
+A subscription belongs to a login on a device: logging out ends it, and whoever logs in next on that browser does not receive someone else's reminders. Every kind of notification can be switched off, and none contains an amount of money. The server only sends to the known push services of the browsers, so a client cannot make it call an arbitrary address. Reminders come from a small loop inside the app that looks once a minute; what went out is remembered, so a restart repeats nothing. With exactly one instance there is nothing to coordinate.
+
 ## Accessibility
 
 Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting.

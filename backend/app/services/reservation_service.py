@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_default_timezone_name, get_zone
 from app.errors import AppError
+from app.models.push import SentNotification
 from app.models.reservation import Reservation
 from app.schemas.reservation import ReservationWrite
 from app.services.access import GroupContext
@@ -150,7 +151,7 @@ def _audit_data(data: ReservationWrite, zone: ZoneInfo, starts_at: datetime, end
     }
 
 
-def _require_changeable(ctx: GroupContext, reservation: Reservation, now: datetime) -> None:
+def check_changeable(ctx: GroupContext, reservation: Reservation, now: datetime) -> None:
     if not ctx.is_admin and ctx.user.id not in (reservation.created_by, reservation.user_id):
         raise AppError(
             status.HTTP_403_FORBIDDEN,
@@ -181,7 +182,7 @@ def create_reservation(ctx: GroupContext, data: ReservationWrite, now: datetime)
 
 def update_reservation(ctx: GroupContext, reservation_id: int, data: ReservationWrite, now: datetime) -> Reservation:
     reservation = get_reservation(ctx, reservation_id)
-    _require_changeable(ctx, reservation, now)
+    check_changeable(ctx, reservation, now)
     previous_user = reservation.user_id
     starts_at, ends_at = _check(ctx, data, now, reservation.id)
     reservation.car_id = data.car_id
@@ -192,6 +193,10 @@ def update_reservation(ctx: GroupContext, reservation_id: int, data: Reservation
     changes = _audit_data(data, group_zone(ctx), starts_at, ends_at)
     if previous_user != data.user_id:
         changes["previous_user_id"] = previous_user
+    # Reminded again at the new time
+    ctx.db.execute(
+        delete(SentNotification).where(SentNotification.kind == "reminder", SentNotification.ref_id == reservation.id)
+    )
     record(ctx, "reservation", reservation.id, "update", changes)
     ctx.db.commit()
     return reservation
@@ -200,7 +205,7 @@ def update_reservation(ctx: GroupContext, reservation_id: int, data: Reservation
 def delete_reservation(ctx: GroupContext, reservation_id: int, now: datetime) -> Reservation:
     """Delete and return the (detached) reservation, e.g. for a notice to the person it was for."""
     reservation = get_reservation(ctx, reservation_id)
-    _require_changeable(ctx, reservation, now)
+    check_changeable(ctx, reservation, now)
     zone = group_zone(ctx)
     record(
         ctx,

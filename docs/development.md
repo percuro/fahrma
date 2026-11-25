@@ -64,7 +64,7 @@ cd e2e && npm ci && npx playwright install chromium webkit
 E2E_BASE_URL=http://localhost:8000 npx playwright test
 ```
 
-The mail tests need an instance that writes its mails to a directory the tests can read: start the container with `-e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail` (the directory writable for the container, e.g. `mkdir -m 777 /tmp/mail`) and set `E2E_MAIL_DIR=/tmp/mail`. Without it they are skipped.
+The mail tests need an instance that writes its mails to a directory the tests can read: start the container with `-e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail` (the directory writable for the container, e.g. `mkdir -m 777 /tmp/mail`) and set `E2E_MAIL_DIR=/tmp/mail`. Without it they are skipped. The same goes for push notifications: `-e PUSH_DIR=/push -v /tmp/push:/push` and `E2E_PUSH_DIR=/tmp/push`.
 
 Without Docker, run `uvicorn app.web:application` with `FRONTEND_DIST=../frontend/dist` (after `npm run build`) and a fresh database instead. The first run creates the account through the setup page; later runs log in (`E2E_USERNAME`/`E2E_PASSWORD`, defaults in `e2e/global-setup.ts`). Every test creates its own group, so tests do not depend on each other.
 

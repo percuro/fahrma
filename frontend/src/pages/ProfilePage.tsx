@@ -10,7 +10,7 @@ import { APP_NAME } from '../app/brand';
 import { useFeedback } from '../components/feedback-context';
 import { useT } from '../i18n';
 import { CreateGroup } from './StartPage';
-import { ChangePassword, DeleteAccount, Devices, EmailAddress, MyData } from './AccountSections';
+import { ChangePassword, DeleteAccount, Devices, EmailAddress, MyData, Notifications } from './AccountSections';
 import { LegalLinks } from '../components/LegalLinks';
 
 const LANGUAGE_NAMES = { de: 'Deutsch', en: 'English' } as const;
@@ -41,6 +41,7 @@ export function ProfilePage() {
       {me.role === 'admin' && (
         <p><Link className="button" to="/admin">{t.nav.admin}</Link></p>
       )}
+      <Notifications />
       <EmailAddress />
       <ChangePassword />
       <Devices />

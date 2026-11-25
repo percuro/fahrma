@@ -34,4 +34,4 @@ Running fahrma for your family is one thing; running it for people you do not kn
 ## What fahrma does not do (yet)
 
 - No payment handling: plans and billing are up to you, outside the app; limits can be set per instance.
-- No notifications by mail about entries or settlements; reminders come with Web Push in 0.7.
+- No notifications by mail about entries or settlements; reminders and news come by Web Push.

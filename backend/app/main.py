@@ -11,6 +11,7 @@ from app.api.routers.groups import router as groups_router
 from app.api.routers.health import router as health_router
 from app.api.routers.invitations import router as invitations_router
 from app.api.routers.meta import router as meta_router
+from app.api.routers.notifications import router as notifications_router
 from app.api.routers.reservations import router as reservations_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
@@ -36,6 +37,7 @@ app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
 app.include_router(invitations_router, prefix="/v1/invites", tags=["invitations"])
 protected = [Depends(require_user)]
 app.include_router(account_router, prefix="/v1/account", tags=["account"], dependencies=protected)
+app.include_router(notifications_router, prefix="/v1/account", tags=["notifications"], dependencies=protected)
 app.include_router(admin_router, prefix="/v1/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 app.include_router(groups_router, prefix="/v1/groups", tags=["groups"], dependencies=protected)
 group = "/v1/groups/{group_id}"

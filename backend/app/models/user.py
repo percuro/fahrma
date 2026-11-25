@@ -29,6 +29,8 @@ class User(Base):
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # A member of an imported group who has no account yet; cannot log in, can be claimed by link
     placeholder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    # Which push notifications the account wants (JSON, see schemas/notifications.py); NULL = defaults
+    notify: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")
