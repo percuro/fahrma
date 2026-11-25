@@ -71,11 +71,12 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Start instance
         run: |
-          # Mails are written as files the tests read (MAIL_DIR instead of an SMTP server)
-          mkdir -m 777 /tmp/mail
+          # Mails and push notifications are written as files the tests read (MAIL_DIR, PUSH_DIR)
+          mkdir -m 777 /tmp/mail /tmp/push
           docker run -d --name app -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 \
             -e REGISTRATION=open -e TERMS_URL=https://example.org/terms -e IMPRINT_URL=https://example.org/imprint \
-            -e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail app:ci
+            -e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail \
+            -e PUSH_DIR=/push -v /tmp/push:/push app:ci
           for i in $(seq 1 60); do
             curl -fsS http://localhost:8000/api/health && break
             sleep 1
@@ -99,6 +100,7 @@ jobs:
         env:
           E2E_BASE_URL: http://localhost:8000
           E2E_MAIL_DIR: /tmp/mail
+          E2E_PUSH_DIR: /tmp/push
         run: npx playwright test
       - name: Server log
         if: failure()

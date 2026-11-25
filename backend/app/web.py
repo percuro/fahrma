@@ -32,7 +32,7 @@ logger = logging.getLogger("app")
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
 # Files that must always be revalidated so updates (service worker!) reach clients
-NO_CACHE_FILES = {"index.html", "sw.js", "registerSW.js", "manifest.webmanifest"}
+NO_CACHE_FILES = {"index.html", "sw.js", "push-sw.js", "registerSW.js", "manifest.webmanifest"}
 LONG_CACHE = "public, max-age=31536000, immutable"
 ICON_CACHE = "public, max-age=604800"
 

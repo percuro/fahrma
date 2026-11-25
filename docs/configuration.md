@@ -24,6 +24,11 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `SMTP_USERNAME`, `SMTP_PASSWORD` | – | Login at the mail server, if it needs one. |
 | `SMTP_PASSWORD_FILE` | – | Read the password from a file instead (e.g. a Docker secret); wins over `SMTP_PASSWORD`. |
 | `MAIL_DIR` | – | Development and tests: write each mail as an `.eml` file into this directory instead of sending it. |
+| `PUSH` | on | Reminders by Web Push; `off` switches them off. Needs no account anywhere; see [Web Push](#web-push). |
+| `VAPID_SUBJECT` | `PUBLIC_URL` | How push services can reach you: `mailto:ops@example.org` or an `https://` address. Apple refuses `http://` subjects. |
+| `VAPID_PRIVATE_KEY_FILE` | – | Your own VAPID key (PEM, EC P-256). Unset: generated on first use and kept in the database. |
+| `PUSH_ALLOWED_HOSTS` | – | Further push service hosts, comma-separated, besides those of Google, Mozilla, Apple and Microsoft. |
+| `PUSH_DIR` | – | Development and tests: write each notification as a `.json` file into this directory instead of sending it. |
 | `MAX_GROUPS_PER_USER` | unlimited | Active group memberships per account (creating and joining). Empty or `0` = unlimited. |
 | `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group. |
 | `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. |
@@ -48,6 +53,15 @@ SMTP_HOST=smtp.example.org
 SMTP_USERNAME=noreply@cars.example.org
 SMTP_PASSWORD=…
 ```
+
+## Web Push
+
+Notifications work without configuration. On first use the instance creates a key pair (VAPID) and keeps it in the database, so it is part of every backup; a restored backup keeps the devices' subscriptions working. Losing the key only means everyone switches notifications on again.
+
+- **What:** a reminder before the own reservation (15 minutes, 1 or 3 hours), a reservation someone else made, moved or cancelled for me, a trip still running after 12 hours or after the own reservation, and a new settlement. Everyone picks in the profile; the texts name people, cars and times, never amounts.
+- **Where:** per device and login, switched on in the profile. Logging out ends it on that device. On iPhone and iPad (iOS 16.4 or later) only the app added to the home screen can receive notifications.
+- **How:** messages are encrypted for the device and only go to the push services of the browsers (`fcm.googleapis.com`, `push.services.mozilla.com`, `push.apple.com`, `notify.windows.com`), never to an address a client hands in. The server needs outgoing HTTPS to them.
+- **When:** reminders are checked once a minute inside the app; there is no separate worker or cron job.
 
 ## Limits
 

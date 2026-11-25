@@ -224,6 +224,8 @@ export interface Meta {
   limits: { groups_per_user: number | null; members_per_group: number | null; cars_per_group: number | null };
   /** E-mail is set up: forgotten password, addresses, links by mail */
   mail: boolean;
+  /** Web Push: the key for subscribing; null = push notifications are off on this instance */
+  vapid_public_key: string | null;
 }
 
 export interface DeviceSession {
@@ -348,4 +350,19 @@ export interface ReservationWrite {
   starts_at: string;
   ends_at: string;
   note: string | null;
+}
+
+export interface NotifySettings {
+  reservation_reminder: boolean;
+  lead_minutes: 15 | 60 | 180;
+  reservation_changes: boolean;
+  open_trip: boolean;
+  settlements: boolean;
+}
+
+export interface NotificationsState {
+  settings: NotifySettings;
+  /** This login receives push notifications */
+  this_device: boolean;
+  devices: number;
 }

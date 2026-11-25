@@ -2,14 +2,15 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, apiUrl, errorText } from '../lib/api';
-import type { DeletionPreview, DeviceSession } from '../lib/types';
+import type { DeletionPreview, DeviceSession, NotificationsState, NotifySettings } from '../lib/types';
+import { PushError, pushSupport, subscribe, unsubscribe } from '../lib/push';
 import { ME_KEY } from '../hooks/useMe';
 import { useFormat } from '../hooks/useFormat';
 import { useMeta } from '../hooks/useMeta';
 import { useSession } from '../hooks/useSession';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
-import { useT } from '../i18n';
+import { useI18n, useT } from '../i18n';
 
 export function ChangePassword() {
   const t = useT();
@@ -261,5 +262,132 @@ export function EmailAddress() {
         </form>
       </div>
     </details>
+  );
+}
+
+const NOTIFICATIONS_KEY = ['notifications'] as const;
+
+/** Push notifications: on this device, and which ones (for every device of the account). */
+export function Notifications() {
+  const t = useT();
+  const n = t.notifications;
+  const { lang } = useI18n();
+  const { toast } = useFeedback();
+  const queryClient = useQueryClient();
+  const meta = useMeta();
+  const vapidKey = meta.data?.vapid_public_key ?? null;
+  const state = useQuery({
+    queryKey: NOTIFICATIONS_KEY,
+    queryFn: () => apiFetch<NotificationsState>('/v1/account/notifications'),
+    enabled: vapidKey !== null,
+  });
+  const support = pushSupport();
+  const [problem, setProblem] = useState('');
+  const describe = (error: unknown) =>
+    error instanceof PushError ? (error.reason === 'denied' ? n.blocked : n.noWorker) : errorText(error);
+
+  const toggle = useMutation({
+    mutationFn: async (on: boolean): Promise<NotificationsState | null> => {
+      if (on) return subscribe(vapidKey!, lang);
+      await unsubscribe();
+      return null;
+    },
+    onMutate: () => setProblem(''),
+    onSuccess: (data, on) => {
+      if (data) queryClient.setQueryData(NOTIFICATIONS_KEY, data);
+      else void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+      toast(on ? n.on : n.off);
+    },
+    onError: (error) => setProblem(describe(error)),
+  });
+  const save = useMutation({
+    mutationFn: (settings: NotifySettings) =>
+      apiFetch<NotificationsState>('/v1/account/notifications', { method: 'PUT', body: JSON.stringify(settings) }),
+    // The switch moves at once; a refusal puts it back
+    onMutate: (settings) => {
+      setProblem('');
+      queryClient.setQueryData<NotificationsState>(NOTIFICATIONS_KEY, (old) => (old ? { ...old, settings } : old));
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(NOTIFICATIONS_KEY, data);
+      toast(t.common.saved);
+    },
+    onError: (error) => {
+      setProblem(describe(error));
+      void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_KEY });
+    },
+  });
+  const test = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account/push-test', { method: 'POST' }),
+    onSuccess: () => toast(n.testSent),
+    onError: (error) => setProblem(describe(error)),
+  });
+
+  if (vapidKey === null) return null;
+  const data = state.data;
+  const settings = data?.settings;
+  const change = (patch: Partial<NotifySettings>) => settings && save.mutate({ ...settings, ...patch });
+  const others = data ? data.devices - (data.this_device ? 1 : 0) : 0;
+  const blocked = support === 'supported' && Notification.permission === 'denied';
+
+  return (
+    <section className="card">
+      <h2 className="mt-0">{n.title}</h2>
+      {queryState([state], !!data) ?? (
+        <div className="form">
+          {support === 'supported' ? (
+            <>
+              <label className="check">
+                <input type="checkbox" checked={data!.this_device} disabled={toggle.isPending}
+                  onChange={(e) => toggle.mutate(e.target.checked)} />
+                {n.thisDevice}
+              </label>
+              <p className="subtle small m-0">{n.thisDeviceHint}</p>
+              {blocked && !data!.this_device && <p className="notice m-0">{n.blocked}</p>}
+            </>
+          ) : (
+            <p className="notice m-0">{support === 'install-first' ? n.installFirst : n.unsupported}</p>
+          )}
+          {others > 0 && <p className="subtle small m-0">{n.otherDevices(others)}</p>}
+          <fieldset className="form plain">
+            <legend className="title">{n.which}</legend>
+            <p className="subtle small m-0">{n.whichHint}</p>
+            <label className="check">
+              <input type="checkbox" checked={settings!.reservation_reminder}
+                onChange={(e) => change({ reservation_reminder: e.target.checked })} />
+              {n.reminder}
+            </label>
+            {settings!.reservation_reminder && (
+              <label className="field">
+                <span>{n.lead}</span>
+                <select value={settings!.lead_minutes}
+                  onChange={(e) => change({ lead_minutes: Number(e.target.value) as NotifySettings['lead_minutes'] })}>
+                  {[15, 60, 180].map((m) => <option key={m} value={m}>{n.leadOption(m)}</option>)}
+                </select>
+              </label>
+            )}
+            <label className="check">
+              <input type="checkbox" checked={settings!.reservation_changes}
+                onChange={(e) => change({ reservation_changes: e.target.checked })} />
+              {n.changes}
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={settings!.open_trip} onChange={(e) => change({ open_trip: e.target.checked })} />
+              {n.openTrip}
+            </label>
+            <label className="check">
+              <input type="checkbox" checked={settings!.settlements} onChange={(e) => change({ settlements: e.target.checked })} />
+              {n.settlements}
+            </label>
+          </fieldset>
+          {problem && <p className="error" role="alert">{problem}</p>}
+          {data!.this_device && (
+            <div className="button-row">
+              <button type="button" className="button" onClick={() => test.mutate()} disabled={test.isPending}>{n.test}</button>
+            </div>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
