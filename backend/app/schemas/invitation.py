@@ -109,3 +109,5 @@ class MetaRead(BaseModel):
     limits: Limits
     # E-mail is set up: forgotten password, addresses, links by mail
     mail: bool
+    # Web Push: the key for PushManager.subscribe(); None = push notifications are off
+    vapid_public_key: str | None = None

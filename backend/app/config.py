@@ -235,6 +235,52 @@ def mail_enabled() -> bool:
     return get_mail_settings() is not None
 
 
+# Hosts of the browsers' push services; the server only ever sends to these (no requests to
+# arbitrary URLs a client hands in). PUSH_ALLOWED_HOSTS adds more, comma-separated.
+PUSH_HOSTS = (
+    "fcm.googleapis.com",  # Chrome, Edge on Android, Samsung Internet, Brave, Opera
+    "push.services.mozilla.com",  # Firefox
+    "push.apple.com",  # Safari on macOS, iOS and iPadOS (web.push.apple.com)
+    "notify.windows.com",  # Edge on Windows (*.notify.windows.com)
+)
+
+
+@dataclass(frozen=True)
+class PushSettings:
+    # "mailto:…" or "https://…": how push services can reach the operator (VAPID "sub")
+    subject: str
+    # PEM file with the VAPID private key; None = generated once and kept in the database
+    key_file: Path | None
+    allowed_hosts: tuple[str, ...]
+    # Development and tests: write each notification as a .json file here instead of sending it
+    directory: Path | None
+
+
+def get_push_settings() -> PushSettings | None:
+    """Web Push is on by default (it needs no external account); PUSH=off turns it off."""
+    if os.getenv("PUSH", "").strip().lower() in {"0", "false", "no", "off"}:
+        return None
+    subject = os.getenv("VAPID_SUBJECT", "").strip() or get_public_url()
+    if not subject.startswith(("mailto:", "https://", "http://")):
+        raise ConfigError(f"VAPID_SUBJECT must start with mailto: or https:// (got {subject!r})")
+    key_file = os.getenv("VAPID_PRIVATE_KEY_FILE", "").strip()
+    if key_file and not Path(key_file).is_file():
+        raise ConfigError(f"VAPID_PRIVATE_KEY_FILE cannot be read: {key_file}")
+    extra = os.getenv("PUSH_ALLOWED_HOSTS", "")
+    hosts = PUSH_HOSTS + tuple(host.strip().lower() for host in extra.split(",") if host.strip())
+    directory = os.getenv("PUSH_DIR", "").strip()
+    return PushSettings(
+        subject=subject,
+        key_file=Path(key_file) if key_file else None,
+        allowed_hosts=hosts,
+        directory=Path(directory) if directory else None,
+    )
+
+
+def push_enabled() -> bool:
+    return get_push_settings() is not None
+
+
 def validate() -> None:
     """Fail fast at startup with a readable message instead of on the first request."""
     get_public_url()
@@ -244,3 +290,4 @@ def validate() -> None:
     for name in LIMIT_NAMES:
         get_limit(name)
     get_mail_settings()
+    get_push_settings()

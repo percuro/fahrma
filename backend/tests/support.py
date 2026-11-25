@@ -35,6 +35,12 @@ TEST_ENV = {
     "MAIL_FROM": "",
     "SMTP_HOST": "",
     "MAIL_DIR": "",
+    # Web Push on (its default), sending replaced in tests that look at it (PushOutbox)
+    "PUSH": "",
+    "PUSH_DIR": "",
+    "VAPID_SUBJECT": "",
+    "VAPID_PRIVATE_KEY_FILE": "",
+    "PUSH_ALLOWED_HOSTS": "",
 }
 HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 

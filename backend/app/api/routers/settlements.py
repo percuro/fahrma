@@ -1,8 +1,8 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 
-from app.api.dependencies.clock import get_group_today
+from app.api.dependencies.clock import Clock, get_clock, get_group_today
 from app.api.dependencies.group import require_member
 from app.config import APP_SLUG
 from app.schemas.settlement import (
@@ -12,7 +12,7 @@ from app.schemas.settlement import (
     SettlementRead,
     TransferRead,
 )
-from app.services import balance_service, export_service
+from app.services import balance_service, export_service, notification_service
 from app.services.access import GroupContext
 
 router = APIRouter()
@@ -49,9 +49,15 @@ def list_settlements(ctx: GroupContext = Depends(require_member)):
 
 @router.post("/settlements", response_model=SettlementRead, status_code=status.HTTP_201_CREATED)
 def create_settlement(
-    data: SettlementCreate, ctx: GroupContext = Depends(require_member), today: date = Depends(get_group_today)
+    data: SettlementCreate,
+    background: BackgroundTasks,
+    ctx: GroupContext = Depends(require_member),
+    today: date = Depends(get_group_today),
+    clock: Clock = Depends(get_clock),
 ):
     settlement = balance_service.create_settlement(ctx, data.period_end, today, data.accept_warnings)
+    items = notification_service.settlement_items(ctx, settlement, clock.now())
+    notification_service.deliver_later(background, ctx.db, items)
     return balance_service.settlement_read(ctx, settlement)
 
 

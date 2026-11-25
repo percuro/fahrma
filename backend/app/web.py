@@ -3,6 +3,7 @@
 Run with: uvicorn app.web:application
 """
 
+import asyncio
 import logging
 import mimetypes
 import os
@@ -19,7 +20,7 @@ from app import config
 from app.db.database import SessionLocal
 from app.main import app as api
 from app.middleware.security_headers import add_security_headers
-from app.services import setup_service
+from app.services import notification_service, setup_service
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -71,7 +72,26 @@ async def lifespan(_app: FastAPI):
         logger.error("Configuration error: %s", exc)
         raise
     announce_setup_token()
+    reminders = asyncio.create_task(remind()) if config.push_enabled() else None
     yield
+    if reminders is not None:
+        reminders.cancel()
+
+
+# Reminders by Web Push: one round a minute, in a thread so requests never wait for it.
+# Exactly one instance runs (SQLite), so there is no second loop to coordinate with.
+REMINDER_INTERVAL_SECONDS = 60
+
+
+async def remind() -> None:
+    while True:
+        await asyncio.sleep(REMINDER_INTERVAL_SECONDS)
+        try:
+            await asyncio.to_thread(notification_service.run_scheduled)
+        except OperationalError:
+            logger.warning("Reminders skipped: database not ready")
+        except Exception:
+            logger.exception("Reminders failed")
 
 
 def announce_setup_token() -> None:

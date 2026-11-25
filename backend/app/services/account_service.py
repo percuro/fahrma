@@ -13,6 +13,7 @@ from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, ROLE_MEMBER, Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
+from app.models.push import PushSubscription, SentNotification
 from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
@@ -23,6 +24,7 @@ from app.services.auth_service import AccountError, AuthService, clear_session_c
 from app.services.devices import describe_user_agent
 from app.services.group_service import delete_group_data
 from app.services.login_rate_limiter import login_rate_limiter
+from app.services.notification_service import export_rows as notification_export
 from app.services.reservation_service import delete_upcoming
 from app.services.rows import row_dict
 
@@ -149,11 +151,14 @@ class AccountService:
         )
         self.db.execute(delete(IdempotencyKey).where(IdempotencyKey.user_id == user.id))
         delete_upcoming(self.db, user.id, utcnow())
+        self.db.execute(delete(PushSubscription).where(PushSubscription.user_id == user.id))
+        self.db.execute(delete(SentNotification).where(SentNotification.user_id == user.id))
         self.repository.delete_sessions(user.id, commit=False)
         user.username = f"~deleted-{user.id}"  # "~" is not allowed in usernames, so it never collides
         user.display_name = anonymous_name(user.id)
         user.password_hash = "!"  # matches no password
         user.locale = None
+        user.notify = None
         user.role = ROLE_USER
         user.is_active = False
         user.last_seen_at = None
@@ -266,6 +271,7 @@ class AccountService:
                     or_(SettlementTransfer.from_user_id == uid, SettlementTransfer.to_user_id == uid)
                 )
             ),
+            "notifications": notification_export(self.db, user),
             "reservations": rows(
                 select(Reservation)
                 .where(or_(Reservation.user_id == uid, Reservation.created_by == uid))

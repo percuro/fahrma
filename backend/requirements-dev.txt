@@ -1,2 +1,4 @@
 -r requirements.txt
 ruff==0.17.6
+# Tests only: decrypts Web Push messages independently of app/services/push.py
+http-ece==1.2.1
