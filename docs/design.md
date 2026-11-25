@@ -26,6 +26,14 @@ A settlement freezes every entry up to its end date and stores a snapshot of its
 
 The interface is German and English; each person picks a language or follows the browser. All texts live in two typed dictionaries in the frontend, without a translation library. The API answers errors with a stable code and parameters, e.g. `{"code": "trip_overlap", "params": {"start_km": 10000, …}}`, and the interface turns them into text in the current language with local number and date formats. The server stays free of interface language; only the CSV export, which is a file people keep, is produced in the requested language.
 
+## Deleting without breaking the books
+
+A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. Instance admins manage accounts, never contents: the administration page shows names, roles and activity, but no groups' trips or amounts.
+
+## Links that do not leak
+
+Invitation and password-reset links carry their token after `#`. Browsers never send that part to the server, so it does not end up in access logs of the app or a reverse proxy. Only a hash of the token is stored, a link works once, and wrong tokens are rate-limited.
+
 ## Not losing input
 
 Entering a trip happens in car parks with poor reception and long gaps between uses. A login that expired in the meantime does not throw the form away: the login appears on top of the page, and after logging in the entry can be saved as it is.

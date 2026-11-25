@@ -1,3 +1,3 @@
 """fahrma backend: cost sharing for cars used by several people."""
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"

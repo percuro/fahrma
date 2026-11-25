@@ -99,6 +99,10 @@ docker compose logs --tail=50 app
 
 Database migrations run automatically when the container starts. The image tag `:0` follows all 0.x releases; pin a specific version (e.g. `:0.2.0`) if you prefer to update deliberately. Read the [changelog](../CHANGELOG.md) before updating.
 
+### Upgrading to 0.4
+
+The database is migrated automatically (`0003`). **The oldest active account becomes the admin of the instance**, all others become normal accounts; change roles on the new administration page (profile → *Instance administration*). Invitation links now carry their token after a `#` (`/invite#…`); links created before still work. Accounts deleted from now on stay as an anonymous name in their groups, so balances do not change.
+
 ### Upgrading to 0.3
 
 The database is migrated automatically. If you use the API directly: the fuel field `liters_ml` is now called `quantity_milli`, and the paths of the web interface are English (old paths redirect).
@@ -143,12 +147,18 @@ Test a restore now and then; a backup you never restored is a hope, not a backup
 
 ## Account management
 
+Accounts are normally created through invitation links: group admins invite people into their group, instance admins can invite people without a group and create password-reset links on the administration page (profile → *Instance administration*). With `REGISTRATION=open`, people can also register themselves. Everyone can change their password, see and log out their devices, download their data and delete their account on the profile page.
+
+From the command line:
+
 ```bash
-docker compose exec app python -m app.cli.create_user <name> --name "Display name"  # new account
-docker compose exec app python -m app.cli.create_user <name> --reset-password       # new password, logs out all devices
+docker compose exec app python -m app.cli.create_user <name> --name "Display name" [--role admin]
+docker compose exec app python -m app.cli.create_user <name> --reset-password   # new password, logs out all devices
+docker compose exec app python -m app.cli.set_role <name> admin                 # emergency exit if no admin is left
+docker compose exec app python -m app.cli.stats                                 # numbers only, no content
 ```
 
-Further accounts are normally created through invitation links in the app.
+Deleting an account removes its login, devices and name. Its trips and payments stay in its groups under an anonymous name ("Person 12"), also in frozen settlements, so the balances of the others stay correct. Groups without any other member are deleted with it; where it was the last group admin, the longest-standing member takes over.
 
 ## Monitoring
 

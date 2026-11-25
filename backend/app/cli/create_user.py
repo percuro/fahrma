@@ -2,6 +2,7 @@ import argparse
 import getpass
 
 from app.db.database import SessionLocal
+from app.models.user import ROLE_USER, ROLES
 from app.repositories.auth_repository import AuthRepository
 from app.services.auth_service import MIN_PASSWORD_LENGTH, AuthService
 
@@ -18,6 +19,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Create an account or reset its password")
     parser.add_argument("username")
     parser.add_argument("--name", help="display name (default: the username)")
+    parser.add_argument("--role", choices=ROLES, default=ROLE_USER, help="role on the instance (default: user)")
     parser.add_argument(
         "--reset-password",
         action="store_true",
@@ -34,8 +36,8 @@ def main() -> None:
                 service.set_password(args.username, password)
                 print(f"Password for {args.username.lower()} has been set.")
             else:
-                user = service.create_user(args.username, password, display_name=args.name)
-                print(f"Account {user.username} has been created.")
+                user = service.create_user(args.username, password, display_name=args.name, role=args.role)
+                print(f"Account {user.username} ({user.role}) has been created.")
         except ValueError as exc:
             raise SystemExit(str(exc)) from exc
     finally:

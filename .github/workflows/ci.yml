@@ -71,7 +71,8 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Start instance
         run: |
-          docker run -d --name app -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 app:ci
+          docker run -d --name app -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 \
+            -e REGISTRATION=open -e TERMS_URL=https://example.org/terms -e IMPRINT_URL=https://example.org/imprint app:ci
           for i in $(seq 1 60); do
             curl -fsS http://localhost:8000/api/health && break
             sleep 1

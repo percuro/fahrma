@@ -1,0 +1,181 @@
+import { useState, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { apiFetch, apiUrl, errorText } from '../lib/api';
+import type { DeletionPreview, DeviceSession } from '../lib/types';
+import { ME_KEY } from '../hooks/useMe';
+import { useFormat } from '../hooks/useFormat';
+import { useFeedback } from '../components/feedback-context';
+import { queryState } from '../components/queryState';
+import { useT } from '../i18n';
+
+export function ChangePassword() {
+  const t = useT();
+  const a = t.account;
+  const { toast } = useFeedback();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [repeat, setRepeat] = useState('');
+  const [localError, setLocalError] = useState('');
+  const queryClient = useQueryClient();
+  const change = useMutation({
+    mutationFn: () =>
+      apiFetch<void>('/v1/account/password', {
+        method: 'POST',
+        body: JSON.stringify({ current_password: current, new_password: next }),
+      }),
+    onSuccess: () => {
+      setCurrent('');
+      setNext('');
+      setRepeat('');
+      toast(a.passwordChanged);
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    if (next.length < 12) return setLocalError(t.auth.passwordTooShort);
+    if (next !== repeat) return setLocalError(t.auth.passwordMismatch);
+    setLocalError('');
+    change.mutate();
+  };
+  const error = localError || (change.isError ? errorText(change.error) : '');
+  return (
+    <details className="card">
+      <summary><h2 className="inline">{a.password}</h2></summary>
+      <form className="form mt-1" onSubmit={submit}>
+        <label className="field">
+          <span>{a.currentPassword}</span>
+          <input type="password" value={current} onChange={(e) => setCurrent(e.target.value)} required autoComplete="current-password" />
+        </label>
+        <label className="field">
+          <span>{a.newPassword}</span>
+          <input type="password" value={next} onChange={(e) => setNext(e.target.value)} required autoComplete="new-password" />
+        </label>
+        <label className="field">
+          <span>{t.auth.passwordRepeat}</span>
+          <input type="password" value={repeat} onChange={(e) => setRepeat(e.target.value)} required autoComplete="new-password" />
+        </label>
+        {error && <p className="error" role="alert">{error}</p>}
+        <button type="submit" className="button" disabled={change.isPending}>{t.common.save}</button>
+      </form>
+    </details>
+  );
+}
+
+export function Devices() {
+  const t = useT();
+  const a = t.account;
+  const f = useFormat();
+  const { toast } = useFeedback();
+  const queryClient = useQueryClient();
+  const sessions = useQuery({
+    queryKey: ['sessions'],
+    queryFn: () => apiFetch<DeviceSession[]>('/v1/account/sessions'),
+  });
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ['sessions'] });
+  const revoke = useMutation({
+    mutationFn: (id: number) => apiFetch<void>(`/v1/account/sessions/${id}`, { method: 'DELETE' }),
+    onSuccess: refresh,
+  });
+  const revokeOthers = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account/sessions/revoke-others', { method: 'POST' }),
+    onSuccess: () => {
+      toast(a.signedOutOthers);
+      void refresh();
+    },
+  });
+  const state = queryState([sessions], !!sessions.data);
+  const others = sessions.data?.filter((s) => !s.current).length ?? 0;
+  return (
+    <section className="card">
+      <h2 className="mt-0">{a.devices}</h2>
+      {state ?? (
+        <ul className="list">
+          {sessions.data!.map((s) => (
+            <li key={s.id} className="row wrap">
+              <span className="main">
+                <span className="title">{s.device ?? a.unknownDevice}</span>
+                <div className="meta">
+                  {[s.current && a.thisDevice, a.lastSeen(f.date(s.last_seen_at ?? s.created_at))].filter(Boolean).join(' · ')}
+                </div>
+              </span>
+              {!s.current && (
+                <button type="button" className="button small" onClick={() => revoke.mutate(s.id)} disabled={revoke.isPending}>
+                  {a.signOutDevice}
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {others > 1 && (
+        <button type="button" className="button" onClick={() => revokeOthers.mutate()} disabled={revokeOthers.isPending}>
+          {a.signOutOthers}
+        </button>
+      )}
+      {(revoke.isError || revokeOthers.isError) && (
+        <p className="error" role="alert">{errorText(revoke.error ?? revokeOthers.error)}</p>
+      )}
+    </section>
+  );
+}
+
+export function MyData() {
+  const a = useT().account;
+  return (
+    <section>
+      <h2>{a.myData}</h2>
+      <p className="subtle small">{a.myDataHint}</p>
+      <p><a className="button" href={apiUrl('/v1/account/export.json')} download>{a.download}</a></p>
+    </section>
+  );
+}
+
+export function DeleteAccount() {
+  const t = useT();
+  const a = t.account;
+  const { confirm } = useFeedback();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [password, setPassword] = useState('');
+  const preview = useQuery({
+    queryKey: ['deletion-preview'],
+    queryFn: () => apiFetch<DeletionPreview>('/v1/account/deletion-preview'),
+    enabled: open,
+  });
+  const remove = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account', { method: 'DELETE', body: JSON.stringify({ password }) }),
+    onSuccess: () => {
+      window.dispatchEvent(new Event('carshare:logout'));
+      queryClient.clear();
+      queryClient.setQueryData(ME_KEY, null);
+      navigate('/', { replace: true });
+    },
+  });
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (await confirm(a.deleteConfirm, { confirmLabel: a.deleteSubmit, danger: true })) remove.mutate();
+  };
+  return (
+    <details className="card danger-zone" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
+      <summary><h2 className="inline">{a.deleteTitle}</h2></summary>
+      <form className="form mt-1" onSubmit={submit}>
+        <p className="m-0">{a.deleteIntro}</p>
+        {preview.data && preview.data.groups_deleted.length > 0 && (
+          <p className="m-0">{a.deleteGroups(preview.data.groups_deleted.map((g) => g.name).join(', '))}</p>
+        )}
+        {preview.data?.admin_handover.map((h) => (
+          <p key={h.group_id} className="m-0">{a.deleteHandover(h.group_name, h.new_admin_name)}</p>
+        ))}
+        <label className="field">
+          <span>{a.deleteConfirmPassword}</span>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+        </label>
+        {remove.isError && <p className="error" role="alert">{errorText(remove.error)}</p>}
+        <button type="submit" className="button primary danger" disabled={remove.isPending || !password}>{a.deleteSubmit}</button>
+      </form>
+    </details>
+  );
+}

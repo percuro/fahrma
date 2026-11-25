@@ -35,21 +35,41 @@ export async function today(request: APIRequestContext): Promise<string> {
   return ((await response.json()) as { today: string }).today;
 }
 
+export const OTHER_PASSWORD = 'e2e-password-456';
+
+/** A one-time link of the group (PUBLIC_URL/invite#<token>). */
+export async function groupInvite(request: APIRequestContext, groupId: number) {
+  return created<{ url: string; expires_at: string }>(await request.post(`/api/v1/groups/${groupId}/invites`));
+}
+
+/** A fresh browser without the e2e account's session. */
+export async function anonymousPage(browser: Browser) {
+  const context = await browser.newContext({ storageState: { cookies: [], origins: [] }, locale: 'de-AT' });
+  return { context, page: await context.newPage() };
+}
+
+/** Fills the account form of the invitation and registration pages. */
+export async function fillAccount(page: Page, name: string, username: string) {
+  await page.getByLabel('Dein Name').fill(name);
+  await page.getByLabel('Benutzername').fill(username);
+  await page.getByLabel('Passwort (mind. 12 Zeichen)').fill(OTHER_PASSWORD);
+  await page.getByLabel('Passwort wiederholen').fill(OTHER_PASSWORD);
+}
+
+export function uniqueUsername(): string {
+  return uniqueName('user').replace(' ', '-').toLowerCase();
+}
+
 /** Registers a second person through the invitation page in a separate browser context. */
 export async function joinByInvite(browser: Browser, request: APIRequestContext, groupId: number, name: string) {
-  const invite = await created<{ url: string; token: string }>(
-    await request.post(`/api/v1/groups/${groupId}/invites`),
-  );
-  const context = await browser.newContext({ storageState: { cookies: [], origins: [] } });
-  const page = await context.newPage();
-  await page.goto(`/invite/${invite.token}`);
-  await page.getByLabel('Dein Name').fill(name);
-  await page.getByLabel('Benutzername').fill(uniqueName('user').replace(' ', '-'));
-  await page.getByLabel('Passwort (mind. 12 Zeichen)').fill('e2e-password-456');
-  await page.getByLabel('Passwort wiederholen').fill('e2e-password-456');
+  const invite = await groupInvite(request, groupId);
+  const { context, page } = await anonymousPage(browser);
+  const username = uniqueUsername();
+  await page.goto(invite.url);
+  await fillAccount(page, name, username);
   await page.getByRole('button', { name: 'Zugang anlegen und beitreten' }).click();
   await expect(page.getByRole('navigation', { name: 'Bereiche' })).toBeVisible();
-  return { context, page };
+  return { context, page, username };
 }
 
 /** Confirms the app's own confirmation dialog (it replaces window.confirm). */

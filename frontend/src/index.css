@@ -287,3 +287,19 @@ th.num, td.num { text-align: right; }
   .toast span { animation: toast-in 0.18s ease-out; }
   @keyframes toast-in { from { opacity: 0; transform: translateY(0.5rem); } to { opacity: 1; transform: none; } }
 }
+
+/* Collapsible card (password, deleting): the heading is the toggle */
+details.card > summary {
+  cursor: pointer; list-style: none; display: flex; align-items: center; gap: var(--space-2);
+  min-height: var(--tap);
+}
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::before { content: "▸"; color: var(--muted); transition: transform 0.15s; }
+details.card[open] > summary::before { transform: rotate(90deg); }
+h2.inline { display: inline; margin: 0; font-size: var(--text-lg); }
+.danger-zone { border-color: var(--minus); }
+.danger-zone > summary h2 { color: var(--minus); }
+
+/* Operator links (imprint, privacy, terms) */
+.legal-links { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); font-size: var(--text-sm); }
+.legal-links a { color: var(--muted); min-height: var(--tap); display: inline-flex; align-items: center; }

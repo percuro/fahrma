@@ -1,13 +1,17 @@
 import { useState, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
 import type { Me } from '../lib/types';
 import { ME_KEY } from '../hooks/useMe';
 import { APP_NAME } from '../app/brand';
 import { useT } from '../i18n';
+import { useMeta } from '../hooks/useMeta';
+import { LegalLinks } from '../components/LegalLinks';
 
 export function LoginPage({ title = APP_NAME, notice }: { title?: string; notice?: string }) {
   const t = useT();
+  const meta = useMeta();
   const queryClient = useQueryClient();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -41,6 +45,10 @@ export function LoginPage({ title = APP_NAME, notice }: { title?: string; notice
         <button type="submit" className="button primary" disabled={login.isPending}>
           {login.isPending ? t.auth.loggingIn : t.auth.login}
         </button>
+        {meta.data?.registration === 'open' && !notice && (
+          <p className="subtle m-0">{t.auth.noAccount} <Link to="/register">{t.auth.register}</Link></p>
+        )}
+        <LegalLinks />
       </form>
     </main>
   );

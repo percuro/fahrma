@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.0 – 2026-11-25
+
+Accounts, administration and data rights – what is needed to run fahrma for people you do not know.
+
+- **Instance administration** (profile → *Instance administration*, for admins of the instance): list of accounts with role, status, number of groups and last activity – never trips or amounts. Make admin, deactivate (logs out everywhere), reactivate, delete, and create password-reset links. Admins never see or set passwords.
+- **Invitations to the instance** without a group, optionally as admin, with a note; open links can be revoked.
+- **Optional open registration** with `REGISTRATION=open` at `/register`, limited per IP address, impossible before the first-run setup.
+- **Profile:** change the password (logs out the other devices), list of logged-in devices with log-out, *My data* as JSON, delete the own account.
+- **Deleting an account** removes login, devices, username and display name – also from frozen settlements – and keeps the bookings under an anonymous name ("Person 12"), so the other members' balances do not change. Groups without any other member are deleted with it; where it was the last group admin, the longest-standing member takes over. The profile shows what will happen before confirming.
+- **Groups:** delete a group (group admins, after typing its name); complete JSON export (`fahrma-group/1`) next to the CSV, as archive and as the basis for moving between instances in 0.5.
+- **Operator links:** `IMPRINT_URL`, `PRIVACY_URL`, `TERMS_URL` are shown on the login, registration, invitation and profile pages; with open registration and `TERMS_URL` the terms must be accepted.
+- **Limits** for hosted instances: `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP`, `MAX_CARS_PER_GROUP` (default unlimited).
+- **CLI:** `create_user --role admin`, `set_role <name> admin|user` as an emergency exit, `stats` with numbers only.
+- New guide [docs/hosting-for-others.md](docs/hosting-for-others.md).
+
+### Security
+
+- Invitation and reset links carry the token in the URL fragment (`/invite#…`), so it never reaches server or proxy logs; only a hash is stored, a link works once (atomically), wrong tokens are rate-limited per IP address.
+- New usernames have 3–32 characters from `a–z 0–9 . _ -`; existing names stay valid.
+- The device list stores a coarse device name from the User-Agent and the last activity, no IP addresses.
+- A test calls every API route that takes an ID with another group's IDs and fails when a new route is missing from it.
+
+### Upgrade notes
+
+- Migration `0003` runs automatically. **The oldest active account becomes admin of the instance**; all others become normal accounts.
+- Invitation links now look like `/invite#<token>`; links with the token in the path (`/invite/<token>`, `/einladung/<token>`) still work.
+- API: `GET /v1/invites/{token}`, `POST /v1/invites/{token}/accept` and the token field of `POST /v1/auth/register` are replaced by `POST /v1/invites/inspect` and `POST /v1/invites/accept` (token in the body). `POST /v1/auth/register` is now the open registration. New: `/v1/meta`, `/v1/account/…`, `/v1/admin/…`, `DELETE /v1/groups/{id}`, `GET /v1/groups/{id}/export.json`. A deactivated account gets 401 `account_disabled` (was 403).
+
 ## 0.3.0 – 2026-11-25
 
 - **New name: fahrma** (Austrian for "let's drive"; working name until now: Autokasse). Image `ghcr.io/percuro/fahrma`.

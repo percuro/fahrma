@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { createGroupWithCar } from './helpers';
+import { createGroupWithCar, groupInvite } from './helpers';
 
 test('start a trip now and finish it later from the overview', async ({ page, request }) => {
   const { group } = await createGroupWithCar(request);
@@ -46,13 +46,15 @@ test('paths of earlier versions redirect', async ({ page, request }) => {
   await expect(page.getByRole('tab', { name: 'Tanken/Laden' })).toHaveAttribute('aria-selected', 'true');
 });
 
-test('invitation links from version 0.1 still work', async ({ page, request }) => {
+test('invitation links with the token in the path still work', async ({ page, request }) => {
   const { group } = await createGroupWithCar(request);
-  const invite = await request.post(`/api/v1/groups/${group.id}/invites`);
-  const { token } = (await invite.json()) as { token: string };
-  await page.goto(`/einladung/${token}`);
-  await expect(page).toHaveURL(new RegExp(`/invite/${token}$`));
-  await expect(page.getByRole('heading', { name: 'Einladung' })).toBeVisible();
+  const invite = await groupInvite(request, group.id);
+  const token = invite.url.split('#')[1];
+  for (const path of [`/einladung/${token}`, `/invite/${token}`]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(new RegExp(`/invite#${token}$`));
+    await expect(page.getByRole('heading', { name: 'Einladung' })).toBeVisible();
+  }
 });
 
 test('an expired session keeps the input: log in again and save', async ({ page, request, context }) => {

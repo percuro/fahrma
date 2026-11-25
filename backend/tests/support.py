@@ -10,10 +10,12 @@ from sqlalchemy.pool import StaticPool
 
 import app.models  # noqa: F401
 from app.api.dependencies.clock import FixedClock, get_clock
+from app.api.routers.auth import register_rate_limiter
 from app.db.database import Base, configure_sqlite, get_db
 from app.main import app
 from app.repositories.auth_repository import AuthRepository
 from app.services.auth_service import AuthService
+from app.services.invitation_service import invitation_rate_limiter
 from app.services.login_rate_limiter import login_rate_limiter
 
 PASSWORD = "sicheres-passwort-123"
@@ -41,7 +43,8 @@ class ApiTestEnvironment:
         configure_sqlite(self.engine)
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False)
-        login_rate_limiter.reset()
+        for limiter in (login_rate_limiter, invitation_rate_limiter, register_rate_limiter):
+            limiter.reset()
 
         def _db():
             db = self.SessionLocal()
@@ -53,10 +56,12 @@ class ApiTestEnvironment:
         app.dependency_overrides[get_db] = _db
         app.dependency_overrides[get_clock] = lambda: FixedClock(self.today)
 
-    def create_user(self, username: str = "alex", password: str = PASSWORD, display_name: str | None = None):
+    def create_user(
+        self, username: str = "alex", password: str = PASSWORD, display_name: str | None = None, role: str = "user"
+    ):
         db = self.SessionLocal()
         try:
-            return AuthService(AuthRepository(db)).create_user(username, password, display_name)
+            return AuthService(AuthRepository(db)).create_user(username, password, display_name, role=role)
         finally:
             db.close()
 
@@ -71,3 +76,14 @@ class ApiTestEnvironment:
         app.dependency_overrides.clear()
         self.engine.dispose()
         self._env.stop()
+
+
+def token_of(url: str) -> str:
+    """The token of an invitation link (PUBLIC_URL/invite#<token>)."""
+    assert "/invite#" in url, url
+    return url.split("#", 1)[1]
+
+
+def accept(client: TestClient, url: str, **fields):
+    """Use an invitation link; without a session this creates the account given in fields."""
+    return client.post("/v1/invites/accept", json={"token": token_of(url), **fields})
