@@ -16,6 +16,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Membership
+from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
@@ -80,5 +81,6 @@ def export_group(ctx: GroupContext) -> dict:
             .where(SettlementTransfer.settlement_id.in_(settlement_ids))
             .order_by(SettlementTransfer.id)
         ),
+        "reservations": rows(select(Reservation).where(Reservation.group_id == group_id).order_by(Reservation.id)),
         "audit_log": audit,
     }

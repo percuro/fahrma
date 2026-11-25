@@ -11,6 +11,7 @@ from app.api.routers.groups import router as groups_router
 from app.api.routers.health import router as health_router
 from app.api.routers.invitations import router as invitations_router
 from app.api.routers.meta import router as meta_router
+from app.api.routers.reservations import router as reservations_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
 from app.config import APP_NAME, api_docs_enabled
@@ -43,3 +44,4 @@ app.include_router(trips_router, prefix=f"{group}/trips", tags=["trips"])
 app.include_router(fuel_router, prefix=f"{group}/fuel", tags=["fuel"])
 app.include_router(expenses_router, prefix=f"{group}/expenses", tags=["expenses"])
 app.include_router(settlements_router, prefix=group, tags=["settlements"])
+app.include_router(reservations_router, prefix=f"{group}/reservations", tags=["reservations"])

@@ -8,7 +8,7 @@ frozen settlements, paid transfers – stay exactly as they were.
 """
 
 import json
-from datetime import date
+from datetime import UTC, date, datetime
 
 from fastapi import status
 from pydantic import ValidationError
@@ -22,6 +22,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, Group, Membership
+from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
@@ -94,6 +95,7 @@ def preview(data: GroupExportFile) -> ImportPreview:
             fuel=len(data.fuel),
             expenses=len(data.expenses),
             settlements=len(data.settlements),
+            reservations=len(data.reservations),
         ),
         first_date=min(dates) if dates else None,
         last_date=max(dates) if dates else None,
@@ -173,6 +175,21 @@ def _check_references(data: GroupExportFile) -> None:
         need(transfer.from_user_id, members, f"settlement_transfers[{i}].from_user_id")
         need(transfer.to_user_id, members, f"settlement_transfers[{i}].to_user_id")
         need(transfer.confirmed_by, members, f"settlement_transfers[{i}].confirmed_by", optional=True)
+    _unique_ids(data.reservations, "reservations")
+    by_car: dict[int, list[tuple[datetime, datetime, int]]] = {}
+    for i, reservation in enumerate(data.reservations):
+        need(reservation.car_id, cars, f"reservations[{i}].car_id")
+        need(reservation.user_id, members, f"reservations[{i}].user_id")
+        need(reservation.created_by, members, f"reservations[{i}].created_by")
+        starts_at, ends_at = _naive_utc(reservation.starts_at), _naive_utc(reservation.ends_at)
+        if ends_at <= starts_at:
+            raise invalid(f"reservations[{i}].ends_at")
+        by_car.setdefault(reservation.car_id, []).append((starts_at, ends_at, i))
+    for periods in by_car.values():
+        periods.sort()
+        for earlier, later in zip(periods, periods[1:], strict=False):
+            if later[0] < earlier[1]:
+                raise invalid(f"reservations[{later[2]}].starts_at")
     for i, entry in enumerate(data.audit_log):
         need(entry.user_id, members, f"audit_log[{i}].user_id")
 
@@ -359,8 +376,26 @@ def _create(db: Session, user: User, data: GroupExportFile, member_id: int) -> G
         if row.id is not None:
             transfers[row.id] = transfer.id
 
+    reservations: dict[int, int] = {}
+    for row in sorted(data.reservations, key=lambda r: r.id):
+        reservation = Reservation(
+            group_id=group.id,
+            car_id=cars[row.car_id],
+            user_id=users[row.user_id],
+            starts_at=_naive_utc(row.starts_at),
+            ends_at=_naive_utc(row.ends_at),
+            note=row.note,
+            created_by=users[row.created_by],
+        )
+        _created_at(reservation, row.created_at)
+        reservation.updated_at = row.updated_at or row.created_at or utcnow()
+        db.add(reservation)
+        db.flush()
+        reservations[row.id] = reservation.id
+
     entity_ids = {
         "car": cars,
+        "reservation": reservations,
         "trip": trips,
         "fuel": fuel,
         "expense": expenses,
@@ -401,6 +436,10 @@ def _create(db: Session, user: User, data: GroupExportFile, member_id: int) -> G
     )
     db.flush()
     return group
+
+
+def _naive_utc(value: datetime) -> datetime:
+    return value.astimezone(UTC).replace(tzinfo=None) if value.tzinfo else value
 
 
 def _created_at(row, value) -> None:
