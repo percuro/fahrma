@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { createGroupWithCar, fakePushSubscription, joinByInvite, PUSH_DIR, pushesTo, today } from './helpers';
 
+const NO_PUSH_HERE = /Home-Bildschirm|keine Mitteilungen empfangen/;
 const DEFAULTS = { reservation_reminder: true, lead_minutes: 60, reservation_changes: true, open_trip: true, settlements: true };
 
 test('choose which notifications to get', async ({ page, request }) => {
@@ -8,7 +9,8 @@ test('choose which notifications to get', async ({ page, request }) => {
   expect((await request.put('/api/v1/account/notifications', { data: DEFAULTS })).status()).toBe(200);
   await page.goto('/profile');
   const section = page.locator('section').filter({ has: page.getByRole('heading', { name: 'Benachrichtigungen' }) });
-  await expect(section.getByLabel('Auf diesem Gerät')).not.toBeChecked();
+  // Browsers with Web Push show the switch; iPhone outside the home-screen app explains how to get it
+  await expect(section.getByLabel('Auf diesem Gerät').or(section.getByText(NO_PUSH_HERE))).toBeVisible();
   await section.getByLabel('Bei einer neuen Abrechnung').uncheck();
   await expect(page.getByRole('status').filter({ hasText: 'Gespeichert' })).toBeVisible();
   await section.getByLabel('Vorlauf').selectOption({ label: '15 Minuten' });
@@ -44,7 +46,9 @@ test('a reservation for someone else reaches their device', async ({ browser, re
 
   // Bea sees this device switched on and can send a test
   await bea.page.goto('/profile');
-  await expect(bea.page.getByLabel('Auf diesem Gerät')).toBeChecked();
+  const toggle = bea.page.getByLabel('Auf diesem Gerät');
+  await expect(toggle.or(bea.page.getByText(NO_PUSH_HERE))).toBeVisible();
+  if (await toggle.isVisible()) await expect(toggle).toBeChecked();
   await bea.page.getByRole('button', { name: 'Test senden' }).click();
   await expect.poll(() => pushesTo(device.endpoint).length, { timeout: 10_000 }).toBe(2);
   expect(pushesTo(device.endpoint)[1].title).toBe('Benachrichtigungen funktionieren');
