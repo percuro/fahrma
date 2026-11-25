@@ -1,6 +1,6 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Response, status
 
 from app.api.dependencies.clock import get_group_today
 from app.api.dependencies.group import require_member
@@ -14,13 +14,23 @@ from app.schemas.entries import (
     TripRead,
     TripWrite,
 )
-from app.services import balance_service, entry_service
+from app.services import balance_service, entry_service, idempotency
 from app.services.access import GroupContext
 from app.services.idempotency import idempotency_key
 
 trips_router = APIRouter()
 fuel_router = APIRouter()
 expenses_router = APIRouter()
+
+
+def _replayed(ctx: GroupContext, key: str | None, kind: str, loader, response: Response):
+    """The entry an earlier request with this key saved (200 and Idempotent-Replayed), or None."""
+    earlier = idempotency.previous(ctx, key, kind)
+    if earlier is None:
+        return None
+    response.status_code = status.HTTP_200_OK
+    response.headers["Idempotent-Replayed"] = "true"
+    return idempotency.load(ctx, earlier, loader)
 
 
 def _trip_reads(ctx: GroupContext, trips: list[Trip], today: date) -> list[TripRead]:
@@ -71,11 +81,13 @@ def read_trip(trip_id: int, ctx: GroupContext = Depends(require_member), today: 
 @trips_router.post("", response_model=TripRead, status_code=status.HTTP_201_CREATED)
 def create_trip(
     data: TripWrite,
+    response: Response,
     ctx: GroupContext = Depends(require_member),
     today: date = Depends(get_group_today),
     key: str | None = Depends(idempotency_key),
 ):
-    return _trip_reads(ctx, [entry_service.create_trip(ctx, data, key)], today)[0]
+    trip = _replayed(ctx, key, "trip", entry_service.get_trip, response) or entry_service.create_trip(ctx, data, key)
+    return _trip_reads(ctx, [trip], today)[0]
 
 
 @trips_router.put("/{trip_id}", response_model=TripRead)
@@ -89,11 +101,15 @@ def update_trip(
 def finish_trip(
     trip_id: int,
     data: TripFinish,
+    response: Response,
     ctx: GroupContext = Depends(require_member),
     today: date = Depends(get_group_today),
     key: str | None = Depends(idempotency_key),
 ):
-    return _trip_reads(ctx, [entry_service.finish_trip(ctx, trip_id, data.end_km, key)], today)[0]
+    trip = _replayed(ctx, key, "finish", entry_service.get_trip, response) or entry_service.finish_trip(
+        ctx, trip_id, data.end_km, key
+    )
+    return _trip_reads(ctx, [trip], today)[0]
 
 
 @trips_router.delete("/{trip_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -117,9 +133,13 @@ def read_fuel(fuel_id: int, ctx: GroupContext = Depends(require_member)):
 
 @fuel_router.post("", response_model=FuelRead, status_code=status.HTTP_201_CREATED)
 def create_fuel(
-    data: FuelWrite, ctx: GroupContext = Depends(require_member), key: str | None = Depends(idempotency_key)
+    data: FuelWrite,
+    response: Response,
+    ctx: GroupContext = Depends(require_member),
+    key: str | None = Depends(idempotency_key),
 ):
-    return _fuel_read(entry_service.create_fuel(ctx, data, key))
+    entry = _replayed(ctx, key, "fuel", entry_service.get_fuel, response) or entry_service.create_fuel(ctx, data, key)
+    return _fuel_read(entry)
 
 
 @fuel_router.put("/{fuel_id}", response_model=FuelRead)
@@ -148,9 +168,15 @@ def read_expense(expense_id: int, ctx: GroupContext = Depends(require_member)):
 
 @expenses_router.post("", response_model=ExpenseRead, status_code=status.HTTP_201_CREATED)
 def create_expense(
-    data: ExpenseWrite, ctx: GroupContext = Depends(require_member), key: str | None = Depends(idempotency_key)
+    data: ExpenseWrite,
+    response: Response,
+    ctx: GroupContext = Depends(require_member),
+    key: str | None = Depends(idempotency_key),
 ):
-    return _expense_read(entry_service.create_expense(ctx, data, key))
+    entry = _replayed(ctx, key, "expense", entry_service.get_expense, response) or entry_service.create_expense(
+        ctx, data, key
+    )
+    return _expense_read(entry)
 
 
 @expenses_router.put("/{expense_id}", response_model=ExpenseRead)

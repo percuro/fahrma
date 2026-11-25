@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
 import type { Me } from '../lib/types';
 import { ME_KEY } from '../hooks/useMe';
+import { useDrafts } from '../hooks/useDrafts';
 import { useSession } from '../hooks/useSession';
 import { APP_NAME } from '../app/brand';
 import { useFeedback } from '../components/feedback-context';
@@ -110,8 +111,10 @@ function Logout() {
       navigate('/');
     },
   });
+  const drafts = useDrafts();
   const onLogout = async () => {
-    if (await confirm(t.auth.confirmLogout, { confirmLabel: t.auth.logout })) logout.mutate();
+    const question = drafts.length > 0 ? t.offline.logoutWithDrafts(drafts.length) : t.auth.confirmLogout;
+    if (await confirm(question, { confirmLabel: t.auth.logout, danger: drafts.length > 0 })) logout.mutate();
   };
   return (
     <div className="button-row">

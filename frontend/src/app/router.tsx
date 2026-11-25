@@ -11,6 +11,7 @@ import { HistoryPage } from '../pages/HistoryPage';
 import { SettlementPage } from '../pages/SettlementPage';
 import { SettlementDetailPage } from '../pages/SettlementDetailPage';
 import { GroupPage } from '../pages/GroupPage';
+import { StatsPage } from '../pages/StatsPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { AdminPage } from '../pages/AdminPage';
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: 'g/:groupId/settlement', element: <SettlementPage /> },
       { path: 'g/:groupId/settlement/:settlementId', element: <SettlementDetailPage /> },
       { path: 'g/:groupId/group', element: <GroupPage /> },
+      { path: 'g/:groupId/stats', element: <StatsPage /> },
       ...legacy,
       { path: '*', element: <Navigate to="/" replace /> },
     ],

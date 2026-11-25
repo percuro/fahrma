@@ -5,6 +5,7 @@ import type {
   AuditEntry,
   Balance,
   Car,
+  CarStats,
   Expense,
   Fuel,
   Group,
@@ -42,9 +43,23 @@ export const useOpenTransfers = () => useGroupQuery<Transfer[]>('/transfers/open
 export const useSettlements = () => useGroupQuery<SettlementBrief[]>('/settlements');
 export const useAudit = () => useGroupQuery<AuditEntry[]>('/audit');
 export const useSettlement = (id: number) => useGroupQuery<Settlement>(`/settlements/${id}`);
-export const useTrip = (id: number | null) => useGroupQuery<Trip>(`/trips/${id}`, id !== null);
+/** One trip; starts from the trip list (also from the offline cache) and is refreshed from the server. */
+export function useTrip(id: number | null) {
+  const gid = useGroupId();
+  const queryClient = useQueryClient();
+  const listKey = [...groupKey(gid), '/trips'];
+  return useQuery({
+    queryKey: [...groupKey(gid), `/trips/${id}`],
+    queryFn: () => apiFetch<Trip>(`/v1/groups/${gid}/trips/${id}`),
+    enabled: isValidGroupId(gid) && id !== null,
+    initialData: () => queryClient.getQueryData<Trip[]>(listKey)?.find((trip) => trip.id === id),
+    initialDataUpdatedAt: () => queryClient.getQueryState(listKey)?.dataUpdatedAt,
+  });
+}
 export const useFuelEntry = (id: number | null) => useGroupQuery<Fuel>(`/fuel/${id}`, id !== null);
 export const useExpense = (id: number | null) => useGroupQuery<Expense>(`/expenses/${id}`, id !== null);
+export const useCarStats = (carId: number | null, year: number | null) =>
+  useGroupQuery<CarStats>(`/cars/${carId}/stats${year ? `?year=${year}` : ''}`, carId !== null);
 export const useBalance = (periodEnd?: string) =>
   useGroupQuery<Balance>(`/balance${periodEnd ? `?period_end=${periodEnd}` : ''}`);
 

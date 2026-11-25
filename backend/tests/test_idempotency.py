@@ -25,7 +25,9 @@ class IdempotencyTest(GroupSetupMixin, unittest.TestCase):
         self.assertEqual(first.status_code, 201, first.text)
         # The answer got lost; the draft is sent again (even unchanged it would overlap the first trip)
         again = self.post("/trips", self.trip_body())
-        self.assertEqual(again.status_code, 201, again.text)
+        self.assertEqual(again.status_code, 200, again.text)
+        self.assertEqual(again.headers["Idempotent-Replayed"], "true")
+        self.assertNotIn("Idempotent-Replayed", first.headers)
         self.assertEqual(again.json()["id"], first.json()["id"])
         self.assertEqual(len(self.alex.get(f"{self.base}/trips").json()), 1)
         # Without the key the same trip is a real overlap
@@ -43,7 +45,7 @@ class IdempotencyTest(GroupSetupMixin, unittest.TestCase):
         for path, body, key in (("/fuel", fuel, "fuel-key-1"), ("/expenses", expense, "expense-key-1")):
             first = self.post(path, body, key)
             again = self.post(path, body, key)
-            self.assertEqual((first.status_code, again.status_code), (201, 201), again.text)
+            self.assertEqual((first.status_code, again.status_code), (201, 200), again.text)
             self.assertEqual(first.json()["id"], again.json()["id"])
             self.assertEqual(len(self.alex.get(f"{self.base}{path}").json()), 1)
 

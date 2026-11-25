@@ -307,3 +307,24 @@ export interface ImportPreview {
   first_date: string | null;
   last_date: string | null;
 }
+
+export interface CarStats {
+  car_id: number;
+  energy_unit: EnergyUnit;
+  year: number | null;
+  years: number[];
+  km: number;
+  trips: number;
+  fuel_cents: number;
+  fuel_entries: number;
+  /** Entries with a quantity, for the average price per litre or kWh */
+  priced_milli: number;
+  priced_cents: number;
+  /** Sums over the intervals between two full tanks that end in the period */
+  consumption: { milli: number; km: number; cents: number; intervals: number } | null;
+  expense_cents: number;
+  categories: { category: string; cents: number }[];
+  members: { user_id: number; km: number }[];
+  /** Months of the year ("2026-03"), or the years ("2026") */
+  periods: { period: string; km: number; fuel_cents: number; expense_cents: number }[];
+}

@@ -1,8 +1,12 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { errorText } from '../lib/api';
 import { parseMoney } from '../lib/format';
 import type { Allocation, Car, Expense, ExpenseWrite, Group, Trip } from '../lib/types';
+import { findDraft, type Draft } from '../lib/outbox';
+import { todayIn } from '../lib/dates';
+import { useEntrySave } from '../hooks/useDrafts';
+import { DiscardDraftButton, DraftNotice } from '../components/DraftNotice';
 import { useCars, useExpense, useGroup, useGroupId, useGroupMutation, useMemberNames, useTrips } from '../hooks/useGroupData';
 import { useSession } from '../hooks/useSession';
 import { useFormat } from '../hooks/useFormat';
@@ -24,7 +28,9 @@ const DEFAULT_ALLOCATION: Record<string, Allocation> = {
 
 export function ExpenseFormPage() {
   const { expenseId } = useParams();
-  const id = expenseId ? Number(expenseId) : null;
+  const [params] = useSearchParams();
+  const draft = findDraft(params.get('draft')) as Draft<'expense'> | undefined;
+  const id = draft ? null : expenseId ? Number(expenseId) : null;
   const group = useGroup();
   const cars = useCars();
   const trips = useTrips();
@@ -32,10 +38,15 @@ export function ExpenseFormPage() {
   const queries = id ? [group, cars, trips, entry] : [group, cars, trips];
   const state = queryState(queries, !!(group.data && cars.data && trips.data && (!id || entry.data)));
   if (state) return state;
-  return <ExpenseForm key={expenseId ?? 'new'} group={group.data!} cars={cars.data!} trips={trips.data!} entry={entry.data} />;
+  return (
+    <ExpenseForm key={draft?.id ?? expenseId ?? 'new'} group={group.data!} cars={cars.data!} trips={trips.data!}
+      entry={entry.data} draft={draft} />
+  );
 }
 
-function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[]; trips: Trip[]; entry?: Expense }) {
+function ExpenseForm({ group, cars, trips, entry, draft }: {
+  group: Group; cars: Car[]; trips: Trip[]; entry?: Expense; draft?: Draft<'expense'>;
+}) {
   const t = useT();
   const x = t.expense;
   const f = useFormat();
@@ -45,26 +56,29 @@ function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[];
   const navigate = useNavigate();
   const name = useMemberNames();
   const activeCars = cars.filter((c) => !c.archived);
-  const [category, setCategory] = useState(entry?.category ?? 'other');
-  const [allocation, setAllocation] = useState<Allocation>(entry?.allocation ?? DEFAULT_ALLOCATION.other);
-  const [carId, setCarId] = useState<number | null>(entry ? entry.car_id : activeCars.length === 1 ? activeCars[0].id : null);
-  const [tripId, setTripId] = useState<number | null>(entry?.trip_id ?? null);
-  const [date, setDate] = useState(entry?.date ?? group.today);
-  const [amount, setAmount] = useState(f.moneyInput(entry?.amount_cents));
-  const [description, setDescription] = useState(entry?.description ?? '');
-  const [paidBy, setPaidBy] = useState<number | null>(entry?.paid_by_user_id ?? me.id);
-  const [allocatedUser, setAllocatedUser] = useState<number | null>(entry?.allocated_user_id ?? me.id);
+  const initial: ExpenseWrite | undefined = draft?.body ?? entry;
+  const entityId = draft ? draft.entityId : (entry?.id ?? null);
+  const editing = entityId !== null;
+  const [category, setCategory] = useState(initial?.category ?? 'other');
+  const [allocation, setAllocation] = useState<Allocation>(initial?.allocation ?? DEFAULT_ALLOCATION.other);
+  const [carId, setCarId] = useState<number | null>(initial ? initial.car_id : activeCars.length === 1 ? activeCars[0].id : null);
+  const [tripId, setTripId] = useState<number | null>(initial?.trip_id ?? null);
+  const [date, setDate] = useState(initial?.date ?? todayIn(group.effective_timezone, group.today));
+  const [amount, setAmount] = useState(f.moneyInput(initial?.amount_cents));
+  const [description, setDescription] = useState(initial?.description ?? '');
+  const [paidBy, setPaidBy] = useState<number | null>(initial?.paid_by_user_id ?? me.id);
+  const [allocatedUser, setAllocatedUser] = useState<number | null>(initial?.allocated_user_id ?? me.id);
   const [localError, setLocalError] = useState('');
-  const readOnly = entry?.settlement_id != null;
+  const readOnly = !draft && entry?.settlement_id != null;
 
-  const save = useGroupMutation<ExpenseWrite>(entry ? 'PUT' : 'POST', () => (entry ? `/expenses/${entry.id}` : '/expenses'), (v) => v);
+  const save = useEntrySave('expense', entityId, draft);
   const remove = useGroupMutation<void>('DELETE', () => `/expenses/${entry?.id}`);
 
   const finishedTrips = trips.filter((trip) => trip.end_km !== null).slice(0, 40);
 
   const chooseCategory = (value: string) => {
     setCategory(value);
-    if (!entry) setAllocation(DEFAULT_ALLOCATION[value] ?? 'equal');
+    if (!editing) setAllocation(DEFAULT_ALLOCATION[value] ?? 'equal');
   };
 
   const submit = (event: FormEvent) => {
@@ -87,8 +101,8 @@ function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[];
         allocated_user_id: allocation === 'single' ? allocatedUser : null,
       },
       {
-        onSuccess: () => {
-          toast(t.common.saved);
+        onSuccess: (outcome) => {
+          toast(outcome === 'draft' ? t.offline.savedAsDraft : t.common.saved);
           navigate(`/g/${gid}`);
         },
       },
@@ -109,7 +123,8 @@ function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[];
 
   return (
     <>
-      <h1>{entry ? x.title : x.newTitle}</h1>
+      <h1>{editing ? x.title : x.newTitle}</h1>
+      {draft && <DraftNotice draft={draft} />}
       {readOnly && <div className="notice">{x.settledNotice}</div>}
       <form className="form" onSubmit={submit}>
         <fieldset disabled={readOnly} className="form plain">
@@ -122,7 +137,7 @@ function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[];
             </label>
             <label className="field">
               <span>{t.common.amount(f.currencySymbol)}</span>
-              <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required autoFocus={!entry} />
+              <input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} required autoFocus={!editing} />
             </label>
           </div>
           <label className="field">
@@ -169,7 +184,8 @@ function ExpenseForm({ group, cars, trips, entry }: { group: Group; cars: Car[];
         <div className="button-row">
           {!readOnly && <button type="submit" className="button primary" disabled={save.isPending}>{t.common.save}</button>}
           <button type="button" className="button" onClick={() => navigate(-1)}>{t.common.cancel}</button>
-          {entry && !readOnly && (
+          {draft && <DiscardDraftButton draft={draft} />}
+          {!draft && entry && !readOnly && (
             <button type="button" className="button danger push-end" onClick={onDelete} disabled={remove.isPending}>{t.common.delete}</button>
           )}
         </div>

@@ -25,6 +25,10 @@ export interface Format {
   quantity(milli: number | null | undefined, unit: string): string;
   /** Price per litre or kWh, e.g. "1,659 €/l" */
   unitPrice(cents: number, milli: number, unit: string): string;
+  /** Consumption: 6420 ml over 100 km → "6,4 l/100 km" */
+  per100km(milli: number, km: number, unit: string): string;
+  /** Short month name for "2026-03", or the year itself for "2026"; narrow: "M" */
+  period(period: string, narrow?: boolean): string;
   /** Cents as text for an input field: 1250 → "12,50" */
   moneyInput(cents: number | null | undefined): string;
   quantityInput(milli: number | null | undefined): string;
@@ -46,6 +50,9 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
   });
   const integer = new Intl.NumberFormat(numberLocale, { maximumFractionDigits: 0 });
   const decimal = new Intl.NumberFormat(numberLocale, { maximumFractionDigits: 2 });
+  const oneDecimal = new Intl.NumberFormat(numberLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const months = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
+  const narrowMonths = new Intl.DateTimeFormat(locale, { month: 'narrow', timeZone: 'UTC' });
   const dates = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
   const symbol = money.formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
   const decimalSeparator = lang === 'de' ? ',' : '.';
@@ -65,6 +72,12 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
     },
     quantity: (milli, unit) => (milli === null || milli === undefined ? DASH : `${decimal.format(milli / 1000)} ${unit}`),
     unitPrice: (cents, milli, unit) => `${rate.format(cents / 100 / (milli / 1000))}/${unit}`,
+    per100km: (milli, km, unit) => `${oneDecimal.format((milli / 1000 / km) * 100)} ${unit}/100 km`,
+    period: (period, narrow = false) => {
+      const [y, m] = period.split('-').map(Number);
+      if (!m) return narrow ? `’${String(y).slice(2)}` : String(y);
+      return (narrow ? narrowMonths : months).format(new Date(Date.UTC(y, m - 1, 1)));
+    },
     moneyInput: (cents) =>
       cents === null || cents === undefined ? '' : (cents / 100).toFixed(2).replace('.', decimalSeparator),
     quantityInput: (milli) =>

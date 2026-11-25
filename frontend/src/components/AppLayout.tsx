@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Me } from '../lib/types';
@@ -11,6 +11,9 @@ import { SetupPage } from '../pages/SetupPage';
 import { APP_NAME } from '../app/brand';
 import { useT } from '../i18n';
 import { Loading } from './Status';
+import { OfflineBanner, OfflineSync } from './OfflineSync';
+import { clearCache } from '../lib/offline-cache';
+import { removeUserDrafts } from '../lib/outbox';
 import { HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
 
 export function AppLayout() {
@@ -20,10 +23,20 @@ export function AppLayout() {
   // The last signed-in state: if the session expires, the page stays (with its input) behind the login dialog
   const [lastMe, setLastMe] = useState<Me | null>(null);
   if (me.data && me.data !== lastMe) setLastMe(me.data);
+  const lastUserId = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastMe) lastUserId.current = lastMe.id;
+  }, [lastMe]);
 
   useEffect(() => {
     const onUnauthorized = () => queryClient.setQueryData(ME_KEY, null);
-    const onLogout = () => setLastMe(null);
+    // Logged out or account deleted: nothing of this person stays on the device
+    const onLogout = () => {
+      setLastMe(null);
+      if (lastUserId.current !== null) removeUserDrafts(lastUserId.current);
+      clearCache();
+      queryClient.removeQueries({ queryKey: ['group'] });
+    };
     window.addEventListener('carshare:unauthorized', onUnauthorized);
     window.addEventListener('carshare:logout', onLogout);
     return () => {
@@ -33,6 +46,8 @@ export function AppLayout() {
   }, [queryClient]);
 
   if (me.isPending) return <main className="center"><Loading /></main>;
+  // Offline with a known account (offline cache): the app works, entries become drafts
+  if (me.data) return <SignedIn me={me.data} />;
   if (me.isError) {
     return (
       <main className="center">
@@ -41,7 +56,6 @@ export function AppLayout() {
       </main>
     );
   }
-  if (me.data) return <SignedIn me={me.data} />;
   if (lastMe) {
     return (
       <>
@@ -72,6 +86,8 @@ function SignedIn({ me }: { me: Me }) {
     <SessionContext.Provider value={me}>
       <a className="skip-link" href="#content">{t.nav.skip}</a>
       <UpdateBanner />
+      <OfflineBanner />
+      <OfflineSync />
       <header className="topbar">
         <NavLink to="/" className="brand">{APP_NAME}</NavLink>
         {inGroup && (
