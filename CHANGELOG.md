@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.7.0 – 2026-11-25
+
+Reserving cars, and reminders on the phone.
+
+- **Reservation calendar** (new tab *Calendar*): one week at a time, a list of days with who has which car; filter by car, and a free day opens a new reservation. Reserve a car for yourself or any member, also a person without an account, in steps of a quarter of an hour, with a note.
+- Two reservations of the same car never overlap; the second one is refused with the name of whoever has the car then. Touching is fine (until 12:00, from 12:00).
+- Times are wall-clock times in the group's time zone. A time skipped when the clocks go forward is refused, a time that happens twice when they go back means the first one.
+- The person it is for, whoever entered it and the group admins can change or cancel a reservation, until it is over. Reservations of up to 31 days; archived cars cannot be reserved.
+- The **overview** shows what is reserved now and next; **starting a trip** says when the car is booked for someone else right now. A reservation never blocks a trip.
+- Reserving needs a connection (checking that the car is free is the point); offline the form says so.
+- **Reminders by Web Push** (profile → *Notifications*), switched on per device: before your own reservation (15 minutes, 1 or 3 hours), when someone else reserves, moves or cancels for you, when your trip is still running after 12 hours or after your reservation, and on a new settlement. Each can be switched off; messages name people, cars and times, never amounts. A test message shows that it works.
+- On iPhone and iPad (iOS 16.4 or later) notifications need the app on the home screen; the profile explains how.
+- Leaving a group or deleting the account cancels upcoming reservations; past ones stay. Reservations move with a personal link and are part of the group export, the move between instances and *My data*. The bottom navigation has five areas now.
+
+### Security
+
+- Web Push needs no account with Google or Apple: the instance creates its own VAPID key on first use and keeps it in the database (so it is part of every backup). Every message is encrypted for the device (RFC 8291) and signed (RFC 8292); the push services only pass it on.
+- The server only sends to the https addresses of known push services (Google, Mozilla, Apple, Microsoft; `PUSH_ALLOWED_HOSTS` adds more), never to an address a client hands in. Subscriptions the push service no longer knows are removed.
+- A subscription belongs to a login: logging out, or out everywhere, ends it; when someone else logs in on the same browser, it moves to that account. Deleting the account removes subscriptions and settings.
+
+### Upgrade notes
+
+- Migrations `0006` (table `reservations`) and `0007` (`push_subscriptions`, `sent_notifications`, `instance_keys`, column `users.notify`) run automatically. Nothing changes for existing data.
+- Web Push is on by default and needs outgoing HTTPS from the container to the push services. `PUSH=off` switches it off; `VAPID_SUBJECT` (default `PUBLIC_URL`, Apple wants `https://` or `mailto:`), `VAPID_PRIVATE_KEY_FILE` and `PUSH_DIR` are optional, see [configuration](docs/configuration.md#web-push). Reminders are checked once a minute inside the app; no cron job needed.
+- API: new `GET/POST /v1/groups/{id}/reservations` (`?from=&to=&car_id=`), `GET/PUT/DELETE /v1/groups/{id}/reservations/{reservation_id}`, `GET/PUT /v1/account/notifications`, `POST/DELETE /v1/account/push-subscription`, `POST /v1/account/push-test`. `/v1/meta` has `vapid_public_key`. The group export (`fahrma-group/1`) has the optional key `reservations`; older files import as before.
+- The image builds the frontend with Node 26.
+
 ## 0.6.0 – 2026-11-25
 
 Working without a connection, and statistics per car.
