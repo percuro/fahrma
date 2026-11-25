@@ -12,6 +12,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, Group, Invite, Membership
+from app.models.idempotency import IdempotencyKey
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
@@ -242,6 +243,7 @@ def delete_group_data(db: Session, group_id: int) -> None:
     db.execute(delete(Settlement).where(Settlement.group_id == group_id))
     db.execute(delete(Car).where(Car.group_id == group_id))
     db.execute(delete(AuditEntry).where(AuditEntry.group_id == group_id))
+    db.execute(delete(IdempotencyKey).where(IdempotencyKey.group_id == group_id))
     db.execute(delete(Invite).where(Invite.group_id == group_id))
     db.execute(delete(Membership).where(Membership.group_id == group_id))
     db.execute(delete(Group).where(Group.id == group_id))

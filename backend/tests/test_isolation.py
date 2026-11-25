@@ -29,6 +29,7 @@ ROUTES = {
     ("GET", "/v1/groups/{group_id}/cars"): (404, None),
     ("POST", "/v1/groups/{group_id}/cars"): (404, {"name": "Mine", "start_odometer_km": 0}),
     ("PUT", "/v1/groups/{group_id}/cars/{car_id}"): (404, {"name": "Mine", "start_odometer_km": 0}),
+    ("GET", "/v1/groups/{group_id}/cars/{car_id}/stats"): (404, None),
     ("GET", "/v1/groups/{group_id}/trips"): (404, None),
     ("POST", "/v1/groups/{group_id}/trips"): (404, {**TRIP, "car_id": 1}),
     ("GET", "/v1/groups/{group_id}/trips/{trip_id}"): (404, None),
@@ -64,6 +65,7 @@ ROUTES = {
 # Routes inside a group that take the ID of an object of that group
 OBJECT_ROUTES = {
     ("PUT", "/v1/groups/{group_id}/cars/{car_id}"),
+    ("GET", "/v1/groups/{group_id}/cars/{car_id}/stats"),
     ("GET", "/v1/groups/{group_id}/trips/{trip_id}"),
     ("PUT", "/v1/groups/{group_id}/trips/{trip_id}"),
     ("DELETE", "/v1/groups/{group_id}/trips/{trip_id}"),

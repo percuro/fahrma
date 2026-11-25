@@ -22,6 +22,11 @@ export class ApiError extends Error {
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await apiRequest<T>(path, init)).data;
+}
+
+/** Like apiFetch, with the response for its headers. */
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<{ data: T; response: Response }> {
   const headers = new Headers(init?.headers);
   headers.set('X-Carshare-CSRF', '1');
   if (init?.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
@@ -49,10 +54,20 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   if (response.status === 204) {
-    return undefined as T;
+    return { data: undefined as T, response };
   }
 
-  return response.json() as Promise<T>;
+  return { data: (await response.json()) as T, response };
+}
+
+/**
+ * The request did not reach the server or got no answer: no connection, a timeout, or the
+ * reverse proxy could not reach the app (502–504). Entries are kept as drafts then.
+ */
+export function isNetworkError(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status === 502 || error.status === 503 || error.status === 504;
+  if (error instanceof TypeError) return true;
+  return error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError');
 }
 
 /** Text for an error in the current interface language (translated when shown, not when thrown). */
@@ -64,6 +79,6 @@ export function errorText(error: unknown): string {
     if (typeof error.detail === 'string') return error.detail;
     return generic.serverError(error.status);
   }
-  if (error instanceof TypeError) return generic.offline;
+  if (isNetworkError(error)) return generic.offline;
   return generic.unknown;
 }

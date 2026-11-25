@@ -3,6 +3,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Group, Invite, Membership
+from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
@@ -14,6 +15,7 @@ __all__ = [
     "Expense",
     "FuelEntry",
     "Group",
+    "IdempotencyKey",
     "Invitation",
     "Invite",
     "Membership",

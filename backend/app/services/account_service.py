@@ -11,6 +11,7 @@ from app.models.audit import AuditEntry
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, ROLE_MEMBER, Group, Invite, Membership
+from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
@@ -144,6 +145,7 @@ class AccountService:
                 Invitation.used_at.is_(None),
             )
         )
+        self.db.execute(delete(IdempotencyKey).where(IdempotencyKey.user_id == user.id))
         self.repository.delete_sessions(user.id, commit=False)
         user.username = f"~deleted-{user.id}"  # "~" is not allowed in usernames, so it never collides
         user.display_name = anonymous_name(user.id)

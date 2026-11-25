@@ -80,3 +80,12 @@ describe('createFormat', () => {
     expect(de.moneyInput(null)).toBe('');
   });
 });
+
+describe('statistics formats', () => {
+  it('formats consumption and periods', () => {
+    const de = createFormat('de');
+    expect(de.per100km(48000, 750, 'l')).toBe('6,4 l/100 km');
+    expect(de.period('2026')).toBe('2026');
+    expect(createFormat('en').period('2026-03', true)).toBe('M');
+  });
+});
