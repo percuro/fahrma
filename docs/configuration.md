@@ -14,6 +14,12 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `CSRF_PROTECTION` | `true` | Only disable for local experiments. |
 | `CORS_ORIGINS` | – | Additional origins allowed to make changes, comma-separated. Rarely needed. |
 | `FORWARDED_ALLOW_IPS` | `*` | Proxies whose `X-Forwarded-For`/`-Proto` headers are trusted. `*` is fine when the container port is only reachable through your reverse proxy (as in the provided `compose.yaml`). If the port is exposed, set it to your proxy's address. The login rate limit relies on the client address. |
+| `REGISTRATION` | `invite` | `invite`: accounts only through invitation links (from a group admin, or from an instance admin on the administration page). `open`: anyone can register at `/register`; only possible after the first-run setup. Registrations are limited to 5 per IP address and hour. |
+| `INVITE_EXPIRY_DAYS` | `7` | How long invitation links stay valid. Password-reset links are valid for 24 hours. |
+| `IMPRINT_URL`, `PRIVACY_URL`, `TERMS_URL` | – | Links to the operator's imprint, privacy policy and terms of use, shown on the login, registration, invitation and profile pages. With `TERMS_URL` and open registration, new accounts must accept the terms. The texts themselves are yours to write and host. |
+| `MAX_GROUPS_PER_USER` | unlimited | Active group memberships per account (creating and joining). Empty or `0` = unlimited. |
+| `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group. |
+| `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 | `API_DOCS` | `false` | `true` serves the OpenAPI documentation at `/api/docs`. Meant for development. |
 | `FRONTEND_DIST` | `/app/frontend` in the image | Directory with the built frontend. Unset: API only (development with Vite). |

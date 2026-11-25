@@ -4,7 +4,7 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.3 – first public release. German and English interface. The features for hosting it for others are next on the [roadmap](#roadmap).
+> Status: 0.4 – accounts, administration and data rights. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
@@ -13,7 +13,9 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 - **Fair rate per km** per car and period, calculated from the actual fuel costs. Fuel without driven km carries over to the next period.
 - **Settlements** freeze a period, show at most n−1 transfers, and let the people involved tick them off. Only the latest settlement can be undone.
 - **Checks instead of surprises:** overlapping odometer readings are rejected, gaps are shown and must be confirmed, running trips block settling.
-- **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. Audit log of every change, CSV export.
+- **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. Audit log of every change, CSV and complete JSON export.
+- **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up.
+- **Instance administration:** accounts, roles, invitation and password-reset links – without seeing anybody's trips. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
 - **German and English**, currency and time zone per group.
 - **Installable web app** for iPhone, Android and desktop, light and dark.
 - **Small footprint:** one container, one SQLite file, no external services.
@@ -35,18 +37,18 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 - [Self-hosting](docs/self-hosting.md): install, reverse proxy (Caddy, Traefik, Nginx Proxy Manager), updates, backup and restore
 - [Configuration](docs/configuration.md): all environment variables
+- [Hosting for others](docs/hosting-for-others.md): checklist when strangers use your instance
 - [How it calculates](docs/calculation.md): rates, splits, rounding, transfers, with an example
 - [Development](docs/development.md): running and testing from source
 - [Design notes](docs/design.md): why it works the way it does
 
 ## Roadmap
 
-- **0.4** ready to be hosted for others: open registration, e-mail (verification, password reset, invitations), account deletion and data export, group export and import between instances, operator links (imprint, privacy), limits
-- **0.5** offline drafts (underground car parks), consumption and cost statistics per car
-- **0.6** reservation calendar, reminders via Web Push
-- **0.7** login via OpenID Connect
-- **0.8** receipt photos
-- **0.9** beta hardening; **1.0** stable API and configuration
+- **0.5** moving groups between instances (JSON import), optional e-mail (verification, forgotten password, invitations)
+- **0.6** offline drafts (underground car parks), consumption and cost statistics per car
+- **0.7** reservation calendar, reminders via Web Push
+- **0.8** login via OpenID Connect
+- **0.9** receipt photos, beta hardening; **1.0** stable API and configuration
 
 ## License
 
