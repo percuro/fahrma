@@ -1,0 +1,130 @@
+"""Runtime configuration, read from environment variables.
+
+Only PUBLIC_URL is required in production; everything else has a safe default.
+See docs/configuration.md for the full reference.
+"""
+
+import logging
+import os
+from functools import lru_cache
+from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+APP_NAME = "fahrma"
+# File names (CSV export); lowercase, no spaces
+APP_SLUG = "fahrma"
+
+logger = logging.getLogger(__name__)
+
+# Deprecated names from 0.1, still accepted so existing installations keep working
+_ALIASES = {"PUBLIC_URL": "PUBLIC_APP_URL", "DEFAULT_TIMEZONE": "APP_TZ"}
+_warned: set[str] = set()
+
+
+class ConfigError(RuntimeError):
+    """Raised when the configuration cannot work; the message is shown to the operator."""
+
+
+def _env(name: str, default: str = "") -> str:
+    value = os.getenv(name, "").strip()
+    if value:
+        return value
+    legacy = _ALIASES.get(name)
+    if legacy:
+        legacy_value = os.getenv(legacy, "").strip()
+        if legacy_value:
+            if legacy not in _warned:
+                logger.warning("%s is deprecated, use %s instead", legacy, name)
+                _warned.add(legacy)
+            return legacy_value
+    return default
+
+
+def env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None or not value.strip():
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def env_positive_int(name: str, default: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+def get_database_url() -> str:
+    return os.getenv("DATABASE_URL", "sqlite:////data/carshare.db")
+
+
+def get_public_url() -> str:
+    """External base URL, e.g. https://cars.example.org (no path)."""
+    value = _env("PUBLIC_URL").rstrip("/")
+    if not value:
+        raise ConfigError("PUBLIC_URL is not set, e.g. PUBLIC_URL=https://cars.example.org")
+    parts = urlsplit(value)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise ConfigError(f"PUBLIC_URL must start with http:// or https:// (got {value!r})")
+    if parts.path not in {"", "/"}:
+        raise ConfigError("PUBLIC_URL must not contain a path; serving under a sub-path is not supported")
+    return f"{parts.scheme}://{parts.netloc}"
+
+
+def get_allowed_origins() -> list[str]:
+    """Origins allowed for state-changing requests: PUBLIC_URL plus optional CORS_ORIGINS."""
+    origins = [get_public_url()]
+    extra = os.getenv("CORS_ORIGINS", "")
+    origins += [origin.strip().rstrip("/") for origin in extra.split(",") if origin.strip()]
+    return origins
+
+
+def csrf_enabled() -> bool:
+    return env_bool("CSRF_PROTECTION", True)
+
+
+def cookie_secure() -> bool:
+    """Secure cookies unless explicitly disabled; defaults to on for an https PUBLIC_URL."""
+    if os.getenv("COOKIE_SECURE", "").strip():
+        return env_bool("COOKIE_SECURE")
+    return get_public_url().startswith("https://")
+
+
+def api_docs_enabled() -> bool:
+    return env_bool("API_DOCS")
+
+
+def get_default_timezone_name() -> str:
+    return _env("DEFAULT_TIMEZONE", "UTC")
+
+
+@lru_cache
+def get_zone(name: str) -> ZoneInfo:
+    """ZoneInfo for an IANA name; raises ValueError for unknown names."""
+    try:
+        return ZoneInfo(name)
+    except (ZoneInfoNotFoundError, ValueError) as exc:
+        raise ValueError(f"Unknown time zone {name!r}") from exc
+
+
+def is_valid_timezone(name: str) -> bool:
+    try:
+        get_zone(name)
+    except ValueError:
+        return False
+    return True
+
+
+def get_default_timezone() -> ZoneInfo:
+    name = get_default_timezone_name()
+    try:
+        return get_zone(name)
+    except ValueError as exc:
+        raise ConfigError(f"Unknown time zone {name!r} in DEFAULT_TIMEZONE") from exc
+
+
+def validate() -> None:
+    """Fail fast at startup with a readable message instead of on the first request."""
+    get_public_url()
+    get_default_timezone()
