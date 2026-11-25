@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.6.0 – 2026-11-26
+## 0.6.0 – 2026-11-25
 
 Working without a connection, and statistics per car.
 
