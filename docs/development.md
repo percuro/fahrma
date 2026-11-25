@@ -28,7 +28,7 @@ export DATABASE_URL=sqlite:///./carshare.db PUBLIC_URL=http://localhost:5173 DEF
 ../.venv/bin/uvicorn app.web:application --reload --port 8000   # prints a setup token
 ```
 
-Set `API_DOCS=true` to get the OpenAPI documentation at `http://localhost:8000/api/docs`.
+Set `API_DOCS=true` to get the OpenAPI documentation at `http://localhost:8000/api/docs`. To try e-mail without a mail server, set `MAIL_FROM=fahrma <noreply@example.org>` and `MAIL_DIR=/tmp/fahrma-mail`: every mail lands there as an `.eml` file.
 
 Tests and checks:
 
@@ -63,6 +63,8 @@ export E2E_SETUP_TOKEN=$(docker logs app-e2e 2>&1 | grep -E '^    [A-Za-z0-9_-]{
 cd e2e && npm ci && npx playwright install chromium webkit
 E2E_BASE_URL=http://localhost:8000 npx playwright test
 ```
+
+The mail tests need an instance that writes its mails to a directory the tests can read: start the container with `-e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail` (the directory writable for the container, e.g. `mkdir -m 777 /tmp/mail`) and set `E2E_MAIL_DIR=/tmp/mail`. Without it they are skipped.
 
 Without Docker, run `uvicorn app.web:application` with `FRONTEND_DIST=../frontend/dist` (after `npm run build`) and a fresh database instead. The first run creates the account through the setup page; later runs log in (`E2E_USERNAME`/`E2E_PASSWORD`, defaults in `e2e/global-setup.ts`). Every test creates its own group, so tests do not depend on each other.
 

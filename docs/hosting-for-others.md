@@ -6,18 +6,22 @@ Running fahrma for your family is one thing; running it for people you do not kn
 
 - [ ] Decide how people get in. `REGISTRATION=invite` (default): only via invitation links from group admins or from you. `REGISTRATION=open`: anyone can register at `/register` (limited to 5 registrations per IP address and hour).
 - [ ] Make sure at least two people you trust are instance admins (profile → *Instance administration*). If all admins are lost: `python -m app.cli.set_role <name> admin`.
-- [ ] Without e-mail there is no self-service "forgot password": people ask an admin for a reset link (valid 24 hours, once). Say so in your help or FAQ.
+- [ ] Set up e-mail ([configuration](configuration.md#e-mail)) so people can reset a forgotten password themselves and open registration confirms addresses. Use a sender domain with SPF and DKIM, otherwise the mails end up in spam. Without e-mail, people ask an admin for a reset link (valid 24 hours, once); say so in your help or FAQ.
 
 ## Operator information
 
 - [ ] Publish an imprint, a privacy policy and terms of use on your own website and set `IMPRINT_URL`, `PRIVACY_URL` and `TERMS_URL`. They appear on the login, registration, invitation and profile pages. With open registration and `TERMS_URL`, new accounts must tick that they accept the terms.
-- [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log), and your reverse proxy's and backups' own logs and retention.
+- [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language, e-mail address if given), people without an account whom a group added (their name only), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log), and your reverse proxy's and backups' own logs and retention.
 - [ ] People can download their data (profile → *My data*, JSON) and delete their account themselves. Deleting keeps their bookings in shared groups under an anonymous name, so the other members' balances stay correct – mention that in the privacy policy.
 
 ## Limits
 
 - [ ] Set `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP` if you want to cap usage (for example per plan). Reaching a limit shows a clear message; archiving a car frees its place.
 - [ ] `python -m app.cli.stats` prints numbers only (accounts, groups, entries per month) – useful for capacity planning without looking into anyone's data.
+
+## Moving groups
+
+- [ ] People can bring a group from another instance (Group → Data → *Complete as JSON* there, *Move a group here from another instance* here). The importing person becomes admin; everyone else becomes a person without an account until they use a personal link. Imports count against your limits and are capped at 20 MB.
 
 ## Operations
 
@@ -29,6 +33,5 @@ Running fahrma for your family is one thing; running it for people you do not kn
 
 ## What fahrma does not do (yet)
 
-- No e-mail: no verification of addresses, no "forgot password" by mail (planned for 0.5).
 - No payment handling: plans and billing are up to you, outside the app; limits can be set per instance.
-- No import of groups from another instance yet (planned for 0.5; the JSON export already uses the format it will read).
+- No notifications by mail about entries or settlements; reminders come with Web Push in 0.7.
