@@ -15,14 +15,39 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `CORS_ORIGINS` | – | Additional origins allowed to make changes, comma-separated. Rarely needed. |
 | `FORWARDED_ALLOW_IPS` | `*` | Proxies whose `X-Forwarded-For`/`-Proto` headers are trusted. `*` is fine when the container port is only reachable through your reverse proxy (as in the provided `compose.yaml`). If the port is exposed, set it to your proxy's address. The login rate limit relies on the client address. |
 | `REGISTRATION` | `invite` | `invite`: accounts only through invitation links (from a group admin, or from an instance admin on the administration page). `open`: anyone can register at `/register`; only possible after the first-run setup. Registrations are limited to 5 per IP address and hour. |
-| `INVITE_EXPIRY_DAYS` | `7` | How long invitation links stay valid. Password-reset links are valid for 24 hours. |
+| `INVITE_EXPIRY_DAYS` | `7` | How long invitation links stay valid. Password-reset links from an admin are valid for 24 hours, those requested by mail for 1 hour. |
 | `IMPRINT_URL`, `PRIVACY_URL`, `TERMS_URL` | – | Links to the operator's imprint, privacy policy and terms of use, shown on the login, registration, invitation and profile pages. With `TERMS_URL` and open registration, new accounts must accept the terms. The texts themselves are yours to write and host. |
+| `MAIL_FROM` | – | Sender of e-mails, e.g. `fahrma <noreply@example.org>`. E-mail is optional and off unless `MAIL_FROM` and `SMTP_HOST` are set; see [E-mail](#e-mail). |
+| `SMTP_HOST` | – | Mail server that accepts the mails for delivery (your provider's SMTP relay). |
+| `SMTP_PORT` | `587` (`465` with `tls`, `25` with `none`) | Port of the mail server. |
+| `SMTP_SECURITY` | `starttls` | `starttls` (port 587), `tls` (implicit TLS, port 465) or `none` (only for a relay on the same host). |
+| `SMTP_USERNAME`, `SMTP_PASSWORD` | – | Login at the mail server, if it needs one. |
+| `SMTP_PASSWORD_FILE` | – | Read the password from a file instead (e.g. a Docker secret); wins over `SMTP_PASSWORD`. |
+| `MAIL_DIR` | – | Development and tests: write each mail as an `.eml` file into this directory instead of sending it. |
 | `MAX_GROUPS_PER_USER` | unlimited | Active group memberships per account (creating and joining). Empty or `0` = unlimited. |
 | `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group. |
 | `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 | `API_DOCS` | `false` | `true` serves the OpenAPI documentation at `/api/docs`. Meant for development. |
 | `FRONTEND_DIST` | `/app/frontend` in the image | Directory with the built frontend. Unset: API only (development with Vite). |
+
+## E-mail
+
+Without e-mail everything works with links that admins copy and pass on. With `MAIL_FROM` and `SMTP_HOST` set:
+
+- **Forgot password:** the login page offers a link by mail to the account's confirmed address (valid 1 hour; at most 3 mails per account and hour). The answer never reveals whether an account or address exists.
+- **Addresses:** everyone can enter an address in the profile; it counts once the link in the confirmation mail is used. The previous address gets a notice when it is replaced. Other members never see addresses; instance admins do.
+- **Links by mail:** group invitations, personal links for people without an account, invitations to the instance and password-reset links can also be sent by mail. Every account can send at most 20 such mails per hour.
+- **Open registration** (`REGISTRATION=open`) then asks for an address and creates the account only when the link in the mail is used (valid 2 days). Registering with an address that already has an account sends that account a hint instead.
+
+Mails are plain text in the recipient's language, sent after the response; a failure is logged without the address. Test the setup by requesting a confirmation link for your own address in the profile.
+
+```env
+MAIL_FROM=fahrma <noreply@cars.example.org>
+SMTP_HOST=smtp.example.org
+SMTP_USERNAME=noreply@cars.example.org
+SMTP_PASSWORD=…
+```
 
 ## Limits
 

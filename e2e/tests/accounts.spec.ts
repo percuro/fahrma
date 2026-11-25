@@ -6,6 +6,9 @@ import {
   createGroupWithCar,
   fillAccount,
   joinByInvite,
+  MAIL_DIR,
+  nextMail,
+  uniqueEmail,
   uniqueName,
   uniqueUsername,
 } from './helpers';
@@ -115,15 +118,29 @@ test('delete a group after typing its name', async ({ page, request }) => {
 });
 
 test('open registration with terms, operator links on the login page', async ({ browser, request }) => {
-  const meta = (await (await request.get('/api/v1/meta')).json()) as { registration: string; links: { terms_url: string | null } };
+  const meta = (await (await request.get('/api/v1/meta')).json()) as {
+    registration: string;
+    mail: boolean;
+    links: { terms_url: string | null };
+  };
   test.skip(meta.registration !== 'open', 'instance runs with REGISTRATION=invite');
+  test.skip(meta.mail && !MAIL_DIR, 'the instance sends mail, but E2E_MAIL_DIR is not set');
   const { context, page } = await anonymousPage(browser);
   await page.goto('/');
   if (meta.links.terms_url) await expect(page.getByRole('link', { name: 'Nutzungsbedingungen' })).toBeVisible();
   await page.getByRole('link', { name: 'Registrieren' }).click();
   await fillAccount(page, 'Neu', uniqueUsername());
+  const email = uniqueEmail();
+  if (meta.mail) await page.getByLabel(/E-Mail-Adresse/).fill(email);
   if (meta.links.terms_url) await page.getByLabel(/Ich akzeptiere/).check();
   await page.getByRole('button', { name: 'Zugang anlegen' }).click();
+  if (meta.mail) {
+    // The account only exists once the link in the mail is used
+    await expect(page.getByRole('heading', { name: 'Fast geschafft' })).toBeVisible();
+    const mail = await nextMail(email);
+    await page.goto(mail.link!);
+    await page.getByRole('button', { name: 'Zugang anlegen' }).click();
+  }
   await expect(page.getByRole('heading', { name: 'Willkommen' })).toBeVisible();
   await context.close();
 });

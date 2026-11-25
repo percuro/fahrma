@@ -7,13 +7,18 @@ from app.db.database import Base
 
 PURPOSE_SIGNUP = "signup"
 PURPOSE_PASSWORD_RESET = "password_reset"
+# Confirms an e-mail address of an existing account (target_user_id, email)
+PURPOSE_VERIFY_EMAIL = "verify_email"
+# Open registration with e-mail: the account is created when the address is confirmed
+PURPOSE_REGISTRATION = "registration"
 
 
 class Invitation(Base):
-    """One-time link of an instance admin: create an account, or set a new password.
+    """One-time link outside of groups: create an account, set a new password, confirm an
+    e-mail address, or finish an open registration.
 
     Invitations into a group are a separate thing (Invite). Only the SHA-256 hash of
-    the token is stored; the link is shown once.
+    the token is stored; the link is shown or sent once.
     """
 
     __tablename__ = "invitations"
@@ -28,6 +33,13 @@ class Invitation(Base):
         ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
     note: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # signup: address the link was sent to · verify_email, registration: the address to confirm
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
+    # registration: the account that is created on confirmation
+    username: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    display_name: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    locale: Mapped[str | None] = mapped_column(String(5), nullable=True)
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
     )

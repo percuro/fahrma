@@ -1,10 +1,19 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import AfterValidator, BaseModel, Field, StringConstraints
 
 RoleLiteral = Literal["admin", "user"]
 LOCALE_PATTERN = r"^(de|en)$"
+
+# A plausible address; whether it works shows when the confirmation link arrives.
+# No whitespace, so it can never break the header of a mail. Stored in lower case.
+EMAIL_PATTERN = r"^[^@\s]{1,64}@[^@\s.]+(\.[^@\s.]+)+$"
+Email = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, max_length=254, pattern=EMAIL_PATTERN),
+    AfterValidator(str.lower),
+]
 
 
 class LoginRequest(BaseModel):
@@ -19,8 +28,26 @@ class RegisterRequest(BaseModel):
     display_name: str | None = Field(default=None, max_length=80)
     password: str = Field(min_length=1, max_length=256)
     locale: str | None = Field(default=None, pattern=LOCALE_PATTERN)
+    # Required when e-mail is set up: the account is created once the address is confirmed
+    email: Email | None = None
     # Required when the operator set TERMS_URL
     accept_terms: bool = False
+
+
+class RegistrationPending(BaseModel):
+    """Open registration with e-mail: a link was sent, the account follows on confirmation."""
+
+    email: str
+
+
+class ForgotPassword(BaseModel):
+    # Username or confirmed e-mail address
+    login: str = Field(min_length=1, max_length=254)
+
+
+class EmailChange(BaseModel):
+    email: Email
+    password: str = Field(min_length=1, max_length=256)
 
 
 class GroupBrief(BaseModel):
@@ -35,6 +62,9 @@ class MeRead(BaseModel):
     display_name: str
     locale: str | None
     role: RoleLiteral
+    # Confirmed address, and one waiting for confirmation
+    email: str | None = None
+    email_pending: str | None = None
     groups: list[GroupBrief]
     today: str
     timezone: str

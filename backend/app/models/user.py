@@ -17,6 +17,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(80), nullable=False, unique=True, index=True)
     display_name: Mapped[str] = mapped_column(String(80), nullable=False)
+    # Confirmed address only (an unconfirmed one waits in an Invitation); used for links by e-mail
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True, unique=True, index=True)
     # Interface language ("de", "en"); NULL = follow the browser
     locale: Mapped[str | None] = mapped_column(String(5), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -25,6 +27,8 @@ class User(Base):
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Deleted accounts stay as an anonymous row, because the bookings of a group refer to them
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # A member of an imported group who has no account yet; cannot log in, can be claimed by link
+    placeholder: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
 
     sessions: Mapped[list["UserSession"]] = relationship(back_populates="user", cascade="all, delete-orphan")

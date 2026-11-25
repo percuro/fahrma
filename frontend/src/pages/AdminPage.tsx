@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
 import type { AdminUser, InvitationCreated, InvitationRead } from '../lib/types';
 import { useSession } from '../hooks/useSession';
+import { useMeta } from '../hooks/useMeta';
 import { useFormat } from '../hooks/useFormat';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
@@ -53,8 +54,9 @@ function Accounts() {
   const me = useSession();
   const { confirm, toast } = useFeedback();
   const queryClient = useQueryClient();
+  const meta = useMeta();
   const users = useQuery({ queryKey: USERS_KEY, queryFn: () => apiFetch<AdminUser[]>('/v1/admin/users') });
-  const [reset, setReset] = useState<{ username: string; link: InvitationCreated } | null>(null);
+  const [reset, setReset] = useState<{ user: AdminUser; link: InvitationCreated } | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
   const update = useMutation({
     mutationFn: ({ id, ...body }: { id: number; role?: string; is_active?: boolean }) =>
@@ -72,10 +74,13 @@ function Accounts() {
     },
   });
   const createReset = useMutation({
-    mutationFn: (user: AdminUser) =>
-      apiFetch<InvitationCreated>(`/v1/admin/users/${user.id}/password-reset`, { method: 'POST' }),
-    onSuccess: (link, user) => {
-      setReset({ username: user.username, link });
+    mutationFn: ({ user, byMail }: { user: AdminUser; byMail: boolean }) =>
+      apiFetch<InvitationCreated>(`/v1/admin/users/${user.id}/password-reset`, {
+        method: 'POST',
+        body: JSON.stringify({ send_email: byMail }),
+      }),
+    onSuccess: (link, { user }) => {
+      setReset({ user, link });
       void refresh();
     },
   });
@@ -101,6 +106,7 @@ function Accounts() {
                 <div className="meta">
                   {[
                     `@${u.username}`,
+                    u.email,
                     u.role === 'admin' && a.adminRole,
                     !u.is_active && a.inactive,
                     a.groups(u.group_count),
@@ -120,7 +126,14 @@ function Accounts() {
                     <button type="button" className="button small" onClick={() => update.mutate({ id: u.id, is_active: true })}>{a.reactivate}</button>
                   )}
                   {u.is_active && (
-                    <button type="button" className="button small" onClick={() => createReset.mutate(u)}>{a.resetLink}</button>
+                    <button type="button" className="button small" onClick={() => createReset.mutate({ user: u, byMail: false })}>
+                      {a.resetLink}
+                    </button>
+                  )}
+                  {u.is_active && u.email && meta.data?.mail && (
+                    <button type="button" className="button small" onClick={() => createReset.mutate({ user: u, byMail: true })}>
+                      {a.resetByMail}
+                    </button>
                   )}
                   <button type="button" className="button small danger" onClick={() => del(u)}>{a.delete}</button>
                 </span>
@@ -131,7 +144,11 @@ function Accounts() {
       )}
       {reset && (
         <div className="mt-1">
-          <p className="m-0">{a.resetCreated(reset.username)}</p>
+          <p className="m-0" role="status">
+            {reset.link.email_sent && reset.user.email
+              ? a.resetSent(reset.user.username, reset.user.email)
+              : a.resetCreated(reset.user.username)}
+          </p>
           <CopyLink url={reset.link.url} />
         </div>
       )}
@@ -147,19 +164,22 @@ function Invitations() {
   const queryClient = useQueryClient();
   const [role, setRole] = useState<'user' | 'admin'>('user');
   const [note, setNote] = useState('');
+  const [email, setEmail] = useState('');
+  const meta = useMeta();
   const invitations = useQuery({
     queryKey: INVITATIONS_KEY,
     queryFn: () => apiFetch<InvitationRead[]>('/v1/admin/invitations'),
   });
   const refresh = () => queryClient.invalidateQueries({ queryKey: INVITATIONS_KEY });
   const create = useMutation({
-    mutationFn: () =>
+    mutationFn: (to: string | null) =>
       apiFetch<InvitationCreated>('/v1/admin/invitations', {
         method: 'POST',
-        body: JSON.stringify({ role, note: note.trim() || null }),
+        body: JSON.stringify({ role, note: note.trim() || null, email: to }),
       }),
     onSuccess: () => {
       setNote('');
+      setEmail('');
       void refresh();
     },
   });
@@ -169,7 +189,7 @@ function Invitations() {
   });
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    create.mutate();
+    create.mutate(email.trim() || null);
   };
   const state = queryState([invitations], !!invitations.data);
   return (
@@ -190,10 +210,17 @@ function Invitations() {
             </select>
           </label>
         </div>
+        {meta.data?.mail && (
+          <label className="field">
+            <span>{a.sendTo}</span>
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} autoComplete="off" />
+          </label>
+        )}
         <button type="submit" className="button primary" disabled={create.isPending}>{a.createInvitation}</button>
       </form>
       {create.data && (
         <div className="mt-1">
+          {create.data.email_sent && create.variables && <p className="m-0" role="status">{a.sentTo(create.variables)}</p>}
           <CopyLink url={create.data.url} />
           <p className="subtle small m-0">{a.validUntil(f.date(create.data.expires_at))}</p>
         </div>
@@ -209,7 +236,7 @@ function Invitations() {
                   {i.purpose === 'password_reset' ? `${a.passwordReset} @${i.target_username ?? '?'}` : (i.note ?? a.signup)}
                 </span>
                 <div className="meta">
-                  {[i.role === 'admin' && a.adminRole, a.validUntil(f.date(i.expires_at))].filter(Boolean).join(' · ')}
+                  {[i.role === 'admin' && a.adminRole, i.email, a.validUntil(f.date(i.expires_at))].filter(Boolean).join(' · ')}
                 </div>
               </span>
               <button type="button" className="button small" onClick={() => revoke.mutate(i.id)} disabled={revoke.isPending}>

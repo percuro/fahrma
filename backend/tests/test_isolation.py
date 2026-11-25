@@ -20,6 +20,8 @@ ROUTES = {
     ("PATCH", "/v1/groups/{group_id}"): (404, {"name": "taken over"}),
     ("DELETE", "/v1/groups/{group_id}"): (404, {"name": "Bert's group"}),
     ("PATCH", "/v1/groups/{group_id}/members/{user_id}"): (404, {"role": "admin"}),
+    ("POST", "/v1/groups/{group_id}/members"): (404, {"display_name": "Mallory"}),
+    ("POST", "/v1/groups/{group_id}/members/{user_id}/invite"): (404, None),
     ("GET", "/v1/groups/{group_id}/export.json"): (404, None),
     ("GET", "/v1/groups/{group_id}/export.csv"): (404, None),
     ("POST", "/v1/groups/{group_id}/invites"): (404, None),
@@ -77,6 +79,7 @@ OBJECT_ROUTES = {
     ("GET", "/v1/groups/{group_id}/settlements/{settlement_id}"),
     ("DELETE", "/v1/groups/{group_id}/settlements/{settlement_id}"),
     ("PATCH", "/v1/groups/{group_id}/members/{user_id}"),
+    ("POST", "/v1/groups/{group_id}/members/{user_id}/invite"),
 }
 
 

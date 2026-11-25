@@ -48,6 +48,12 @@ class Invite(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    # Personal link for a placeholder member: whoever uses it becomes that member
+    placeholder_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    # Address the link was sent to, if any
+    email: Mapped[str | None] = mapped_column(String(254), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     used_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

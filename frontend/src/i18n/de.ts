@@ -69,6 +69,16 @@ export const de = {
     usernameHint: '3–32 Zeichen: Kleinbuchstaben a–z, Ziffern, Punkt, Binde- oder Unterstrich',
     register: 'Registrieren',
     noAccount: 'Noch keinen Zugang?',
+    forgotPassword: 'Passwort vergessen?',
+  },
+  forgot: {
+    title: 'Passwort vergessen',
+    intro: 'Gib deinen Benutzernamen oder deine bestätigte E-Mail-Adresse ein. Du bekommst einen Link, mit dem du ein neues Passwort festlegst.',
+    login: 'Benutzername oder E-Mail-Adresse',
+    submit: 'Link anfordern',
+    sent: 'Wenn zu diesem Zugang eine bestätigte E-Mail-Adresse gehört, ist jetzt eine Nachricht unterwegs. Der Link darin gilt eine Stunde.',
+    noEmail: 'Keine Adresse hinterlegt? Dann kann dir die Verwaltung dieser Instanz einen Link zum Zurücksetzen erstellen.',
+    back: 'Zurück zur Anmeldung',
   },
   setup: {
     title: 'Einrichtung',
@@ -99,6 +109,20 @@ export const de = {
     resetIntro: (username: string) => `Lege ein neues Passwort für @${username} fest. Alle Geräte werden dabei abgemeldet.`,
     resetSubmit: 'Passwort setzen',
     newPassword: 'Neues Passwort (mind. 12 Zeichen)',
+    titleAs: (group: string, member: string) => `Einladung zu „${group}“ als ${member}`,
+    takeOverQuestion: (name: string, group: string, member: string) =>
+      `Hallo ${name}, möchtest du in „${group}“ den Platz von „${member}“ übernehmen? Alle bisherigen Einträge von ${member} gehören dann zu deinem Zugang.`,
+    takeOver: 'Platz übernehmen',
+    createAccountAs: (member: string) =>
+      `Lege deinen Zugang an. Alle bisherigen Einträge von „${member}“ gehören dann dir.`,
+    takeOverSubmit: 'Zugang anlegen und Platz übernehmen',
+    verifyTitle: 'E-Mail-Adresse bestätigen',
+    verifyIntro: (email: string, username: string) => `Gehört ${email} zu deinem Zugang @${username}?`,
+    verifySubmit: 'Ja, Adresse bestätigen',
+    verified: (email: string) => `Danke! ${email} ist jetzt bestätigt.`,
+    registrationTitle: 'Registrierung abschließen',
+    registrationIntro: (username: string, email: string) => `Zugang @${username} für ${email} jetzt anlegen?`,
+    registrationSubmit: 'Zugang anlegen',
   },
   register: {
     title: 'Registrieren',
@@ -107,6 +131,10 @@ export const de = {
     terms: 'Nutzungsbedingungen',
     submit: 'Zugang anlegen',
     haveAccount: 'Ich habe schon einen Zugang',
+    email: 'E-Mail-Adresse (dorthin kommt der Bestätigungslink)',
+    checkMailTitle: 'Fast geschafft',
+    checkMail: (email: string) =>
+      `Wir haben einen Link an ${email} geschickt. Öffne ihn, um die Registrierung abzuschließen – erst dann gibt es deinen Zugang. Der Link gilt 2 Tage.`,
   },
   legal: {
     imprint: 'Impressum',
@@ -121,6 +149,24 @@ export const de = {
     groupNamePlaceholder: 'z. B. Unser Golf',
     create: 'Anlegen',
     createAnother: 'Weitere Fahrgemeinschaft anlegen',
+    importGroup: 'Fahrgemeinschaft von einer anderen Instanz übernehmen',
+  },
+  import: {
+    title: 'Fahrgemeinschaft übernehmen',
+    intro: (app: string) =>
+      `Holt eine Fahrgemeinschaft von einer anderen ${app}-Instanz herüber – mit allen Autos, Einträgen und Abrechnungen. Die Datei bekommst du dort unter Gruppe → Daten → „Vollständig als JSON“.`,
+    file: 'Exportdatei (JSON)',
+    checking: 'Datei wird geprüft …',
+    counts: (cars: number, trips: number, fuel: number, expenses: number, settlements: number) =>
+      `${cars} Autos · ${trips} Fahrten · ${fuel} Tank-/Ladeeinträge · ${expenses} Kosten · ${settlements} Abrechnungen`,
+    period: (from: string, to: string) => `Einträge vom ${from} bis ${to}`,
+    exported: (date: string) => `exportiert am ${date}`,
+    whoAreYou: 'Wer davon bist du?',
+    whoHint:
+      'Du verwaltest die neue Fahrgemeinschaft. Alle anderen werden zu Personen ohne Zugang; mit einem persönlichen Link übernehmen sie später ihren Platz.',
+    submit: 'Übernehmen',
+    importing: 'Wird übernommen …',
+    done: 'Fahrgemeinschaft übernommen',
   },
   dashboard: {
     noCar: 'Noch kein Auto angelegt.',
@@ -331,6 +377,19 @@ export const de = {
     copied: 'Kopiert',
     newLink: 'Neuer Link',
     validUntil: (date: string) => `gültig bis ${date}`,
+    sendTo: 'Auch per E-Mail schicken an (optional)',
+    sentTo: (email: string) => `An ${email} geschickt.`,
+    withoutAccount: 'ohne Zugang',
+    linkOpen: (date: string) => `Link offen bis ${date}`,
+    personalLink: 'Link zum Übernehmen',
+    personalLinkHint: (name: string) =>
+      `Mit diesem Link legt ${name} einen Zugang an (oder meldet sich an) und übernimmt dabei den Platz samt allen Einträgen. Er gilt 7 Tage und funktioniert einmal; ein neuer Link ersetzt den alten.`,
+    renameMember: 'Umbenennen',
+    addPerson: 'Person ohne Zugang hinzufügen',
+    addPersonHint:
+      'Für jemanden, der nichts selbst einträgt: Ihr tragt Fahrten und Zahlungen für die Person ein. Später kann sie mit einem persönlichen Link übernehmen.',
+    add: 'Hinzufügen',
+    close: 'Schließen',
     cars: 'Autos',
     current: (km: string) => `aktuell ${km}`,
     archived: 'stillgelegt',
@@ -373,6 +432,8 @@ export const de = {
       finish: 'beendet',
       paid: 'als bezahlt markiert',
       unpaid: 'wieder offen',
+      import: 'übernommen',
+      claim: 'Platz übernommen',
     } as Record<string, string>,
   },
   car: {
@@ -414,6 +475,18 @@ export const de = {
     deleteConfirmPassword: 'Zur Bestätigung dein Passwort',
     deleteSubmit: 'Zugang endgültig löschen',
     deleteConfirm: 'Zugang wirklich löschen? Das lässt sich nicht rückgängig machen.',
+    email: 'E-Mail-Adresse',
+    emailHint: 'Für „Passwort vergessen“ und Einladungen per E-Mail. Die anderen Mitglieder sehen sie nicht.',
+    emailNone: 'Noch keine Adresse hinterlegt.',
+    emailCurrent: (email: string) => `Bestätigt: ${email}`,
+    emailPending: (email: string) => `Wartet auf Bestätigung: ${email} – öffne den Link in der Nachricht.`,
+    emailNew: 'Neue Adresse',
+    emailSend: 'Bestätigungslink schicken',
+    emailSent: 'Link verschickt – bitte im Postfach öffnen.',
+    emailCancel: 'Änderung verwerfen',
+    emailRemove: 'Adresse entfernen',
+    emailRemoved: 'Adresse entfernt',
+    confirmPassword: 'Dein Passwort zur Bestätigung',
   },
   admin: {
     title: 'Verwaltung der Instanz',
@@ -449,6 +522,10 @@ export const de = {
     copy: 'Kopieren',
     copied: 'Kopiert',
     validUntil: (date: string) => `gültig bis ${date}`,
+    sendTo: 'An E-Mail-Adresse schicken (optional)',
+    sentTo: (email: string) => `An ${email} geschickt.`,
+    resetByMail: 'Link per E-Mail',
+    resetSent: (name: string, email: string) => `Link für @${name} an ${email} geschickt – gilt 24 Stunden, einmal:`,
   },
   errors: {
     csrf_rejected: () => 'Ungültige Anfrageherkunft. Bitte die Seite neu laden.',
@@ -512,6 +589,19 @@ export const de = {
     invitation_not_found: () => 'Einladung nicht gefunden.',
     member_deleted: () => 'Dieser Zugang wurde gelöscht.',
     group_name_mismatch: () => 'Der Name stimmt nicht mit der Gruppe überein.',
+    import_invalid: (p: Params) => `Die Datei ist kein gültiger Export einer Fahrgemeinschaft (Stelle: ${s(p.where)}).`,
+    import_format: (p: Params) =>
+      `Das ist kein Export einer Fahrgemeinschaft (erwartet ${s(p.expected)}${p.found ? `, gefunden ${s(p.found)}` : ''}).`,
+    import_too_large: (p: Params) => `Die Datei ist zu groß (höchstens ${s(p.max_mb)} MB).`,
+    import_member_invalid: () => 'Bitte wähle aus, wer du bist – eine aktive Person aus der Datei.',
+    already_in_group: () =>
+      'Du bist schon in dieser Fahrgemeinschaft. Dieser persönliche Link ist für jemand anderen gedacht.',
+    member_inactive: () => 'Nimm die Person zuerst wieder auf.',
+    member_has_account: () => 'Personen mit Zugang wählen ihren Namen selbst.',
+    mail_disabled: () => 'Auf dieser Instanz ist kein E-Mail-Versand eingerichtet.',
+    email_taken: () => 'Diese Adresse gehört schon zu einem anderen Zugang.',
+    email_required: () => 'Bitte gib deine E-Mail-Adresse an.',
+    no_email: () => 'Dieser Zugang hat keine bestätigte E-Mail-Adresse.',
     limit_reached: (p: Params) => {
       const what: Record<string, string> = {
         groups_per_user: 'Fahrgemeinschaften pro Person',

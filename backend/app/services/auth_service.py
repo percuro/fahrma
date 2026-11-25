@@ -164,7 +164,7 @@ class AuthService:
 
     def set_password(self, username: str, password: str) -> None:
         user = self.repository.get_user_by_username(username)
-        if user is None or user.is_deleted:
+        if user is None or user.is_deleted or user.placeholder:
             raise AccountError("account_not_found", "Account not found", status.HTTP_404_NOT_FOUND)
         self.check_password(password)
         self.repository.set_password(user, self.hash_password(password))

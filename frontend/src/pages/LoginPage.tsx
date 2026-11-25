@@ -45,6 +45,9 @@ export function LoginPage({ title = APP_NAME, notice }: { title?: string; notice
         <button type="submit" className="button primary" disabled={login.isPending}>
           {login.isPending ? t.auth.loggingIn : t.auth.login}
         </button>
+        {meta.data?.mail && !notice && (
+          <Link to="/forgot-password" className="link-button">{t.auth.forgotPassword}</Link>
+        )}
         {meta.data?.registration === 'open' && !notice && (
           <p className="subtle m-0">{t.auth.noAccount} <Link to="/register">{t.auth.register}</Link></p>
         )}

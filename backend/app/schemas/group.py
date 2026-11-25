@@ -1,4 +1,8 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field
+
+from app.schemas.auth import Email
 
 
 class GroupCreate(BaseModel):
@@ -21,11 +25,27 @@ class MemberRead(BaseModel):
     active: bool
     # The account was deleted; the bookings stay under an anonymous name
     deleted: bool = False
+    # A person without an account (imported or added by an admin)
+    placeholder: bool = False
+    # Admins only: until when the open personal link of a placeholder works
+    link_expires_at: datetime | None = None
 
 
 class MemberUpdate(BaseModel):
     role: str | None = Field(default=None, pattern=r"^(admin|member)$")
     active: bool | None = None
+    # Only for people without an account
+    display_name: str | None = Field(default=None, min_length=1, max_length=80)
+
+
+class PlaceholderCreate(BaseModel):
+    display_name: str = Field(min_length=1, max_length=80)
+
+
+class InviteCreate(BaseModel):
+    """Optional body of a new group link: send it by e-mail as well."""
+
+    email: Email | None = None
 
 
 class GroupRead(BaseModel):

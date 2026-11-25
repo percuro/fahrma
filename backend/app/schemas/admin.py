@@ -11,6 +11,8 @@ class AdminUserRead(BaseModel):
     id: int
     username: str
     display_name: str
+    # Confirmed address, so admins can reach the person and mail a reset link
+    email: str | None = None
     role: RoleLiteral
     is_active: bool
     created_at: datetime

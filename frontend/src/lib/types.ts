@@ -10,6 +10,9 @@ export interface Me {
   display_name: string;
   locale: 'de' | 'en' | null;
   role: 'admin' | 'user';
+  /** Confirmed address, and one waiting for confirmation */
+  email: string | null;
+  email_pending: string | null;
   groups: GroupBrief[];
   today: string;
   timezone: string;
@@ -23,6 +26,10 @@ export interface Member {
   active: boolean;
   /** The account was deleted; its bookings stay under an anonymous name */
   deleted: boolean;
+  /** A person without an account (imported or added by an admin) */
+  placeholder: boolean;
+  /** Admins only: until when the open personal link of a placeholder works */
+  link_expires_at: string | null;
 }
 
 export interface Group {
@@ -215,6 +222,8 @@ export interface Meta {
   setup_needed: boolean;
   links: { imprint_url: string | null; privacy_url: string | null; terms_url: string | null };
   limits: { groups_per_user: number | null; members_per_group: number | null; cars_per_group: number | null };
+  /** E-mail is set up: forgotten password, addresses, links by mail */
+  mail: boolean;
 }
 
 export interface DeviceSession {
@@ -235,6 +244,7 @@ export interface AdminUser {
   id: number;
   username: string;
   display_name: string;
+  email: string | null;
   role: 'admin' | 'user';
   is_active: boolean;
   created_at: string;
@@ -247,6 +257,13 @@ export interface InvitationCreated {
   purpose: 'signup' | 'password_reset';
   url: string;
   expires_at: string;
+  email_sent: boolean;
+}
+
+export interface GroupInviteCreated {
+  url: string;
+  expires_at: string;
+  email_sent: boolean;
 }
 
 export interface InvitationRead {
@@ -254,15 +271,39 @@ export interface InvitationRead {
   purpose: 'signup' | 'password_reset';
   role: 'admin' | 'user' | null;
   note: string | null;
+  email: string | null;
   target_username: string | null;
   created_by_username: string | null;
   created_at: string;
   expires_at: string;
 }
 
+/** Open registration with e-mail: the account follows once the link in the mail is used */
+export interface RegistrationPending {
+  email: string;
+}
+
+export type InvitationKind = 'group' | 'signup' | 'password_reset' | 'verify_email' | 'registration';
+
 export interface InvitationInfo {
-  kind: 'group' | 'signup' | 'password_reset';
+  kind: InvitationKind;
   group_name: string | null;
+  /** Personal group link: the member without an account whose place it takes over */
+  member_name: string | null;
   username: string | null;
+  /** verify_email, registration: the address being confirmed */
+  email: string | null;
   expires_at: string;
+}
+
+export interface ImportPreview {
+  app_version: string | null;
+  exported_at: string | null;
+  name: string;
+  currency: string;
+  timezone: string | null;
+  members: { user_id: number; display_name: string; role: 'admin' | 'member'; active: boolean; deleted: boolean }[];
+  counts: { cars: number; trips: number; fuel: number; expenses: number; settlements: number };
+  first_date: string | null;
+  last_date: string | null;
 }

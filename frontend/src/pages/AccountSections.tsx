@@ -5,6 +5,8 @@ import { apiFetch, apiUrl, errorText } from '../lib/api';
 import type { DeletionPreview, DeviceSession } from '../lib/types';
 import { ME_KEY } from '../hooks/useMe';
 import { useFormat } from '../hooks/useFormat';
+import { useMeta } from '../hooks/useMeta';
+import { useSession } from '../hooks/useSession';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
 import { useT } from '../i18n';
@@ -176,6 +178,88 @@ export function DeleteAccount() {
         {remove.isError && <p className="error" role="alert">{errorText(remove.error)}</p>}
         <button type="submit" className="button primary danger" disabled={remove.isPending || !password}>{a.deleteSubmit}</button>
       </form>
+    </details>
+  );
+}
+
+/** The confirmed address (for "forgot password"), one waiting for confirmation, and changing it. */
+export function EmailAddress() {
+  const t = useT();
+  const a = t.account;
+  const me = useSession();
+  const meta = useMeta();
+  const { toast } = useFeedback();
+  const queryClient = useQueryClient();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const refresh = () => queryClient.invalidateQueries({ queryKey: ME_KEY });
+  const change = useMutation({
+    mutationFn: () =>
+      apiFetch<void>('/v1/account/email', { method: 'POST', body: JSON.stringify({ email: email.trim(), password }) }),
+    onSuccess: () => {
+      setEmail('');
+      setPassword('');
+      toast(a.emailSent);
+      void refresh();
+    },
+  });
+  const cancel = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account/email/pending', { method: 'DELETE' }),
+    onSuccess: refresh,
+  });
+  const remove = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account/email', { method: 'DELETE', body: JSON.stringify({ password }) }),
+    onSuccess: () => {
+      setPassword('');
+      toast(a.emailRemoved);
+      void refresh();
+    },
+  });
+  // Without e-mail on the instance an address is useless; an old one can still be removed
+  if (!meta.data?.mail && !me.email) return null;
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    change.mutate();
+  };
+  const error = change.error ?? cancel.error ?? remove.error;
+  return (
+    <details className="card" open={!!me.email_pending || undefined}>
+      <summary><h2 className="inline">{a.email}</h2></summary>
+      <div className="form mt-1">
+        <p className="subtle small m-0">{a.emailHint}</p>
+        <p className="m-0">{me.email ? a.emailCurrent(me.email) : a.emailNone}</p>
+        {me.email_pending && (
+          <div className="button-row mt-0">
+            <p className="m-0" role="status">{a.emailPending(me.email_pending)}</p>
+            <button type="button" className="button small" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+              {a.emailCancel}
+            </button>
+          </div>
+        )}
+        <form className="form" onSubmit={submit}>
+          {meta.data?.mail && (
+            <label className="field">
+              <span>{a.emailNew}</span>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} autoComplete="email" />
+            </label>
+          )}
+          <label className="field">
+            <span>{a.confirmPassword}</span>
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" />
+          </label>
+          {error && <p className="error" role="alert">{errorText(error)}</p>}
+          <div className="button-row mt-0">
+            {meta.data?.mail && (
+              <button type="submit" className="button primary" disabled={change.isPending || !email.trim()}>{a.emailSend}</button>
+            )}
+            {me.email && (
+              <button type="button" className="button" onClick={() => remove.mutate()} disabled={remove.isPending || !password}>
+                {a.emailRemove}
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
     </details>
   );
 }

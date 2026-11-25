@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.5.0 – 2026-11-25
+
+Moving groups between instances, people without an account, and optional e-mail.
+
+- **Move a group here** (profile or start page → *Move a group here from another instance*): upload the complete JSON export of another instance, see what it contains, pick which member you are, done. Every car, trip, fuel entry, expense, settlement, paid transfer and the change log arrive with new IDs and exactly the same numbers. The file is checked strictly first; nothing in it can refer to anything outside the new group. At most 20 MB; the instance's limits apply.
+- **People without an account:** group admins can add someone by name only (*Add a person without an account*); the others record trips and payments for them. Imported groups bring every other member in this way. Admins can rename them.
+- **Personal links:** *Link to take over* creates a one-time link for a person without an account. Whoever uses it becomes that member – with a new account, or with their existing one, which then takes over every booking in that group, including frozen settlements. Only the newest link works.
+- **Optional e-mail** (`MAIL_FROM`, `SMTP_HOST`, …; see [configuration](docs/configuration.md#e-mail)):
+  - *Forgot password?* on the login page sends a link (valid 1 hour) to the account's confirmed address, without revealing whether an account exists.
+  - E-mail address in the profile, used once confirmed by a link; the previous address gets a notice.
+  - Group invitations, personal links, invitations to the instance and password-reset links can also be sent by mail. An account that joins through a mailed link has that address confirmed.
+  - With open registration the address is required and the account is created when the confirmation link is used.
+  - Plain-text mails in German or English, sent after the response; at most 20 mails per account and hour, 3 reset mails per account and hour.
+- Instance admins see confirmed addresses and can send a reset link by mail. `stats` counts people without an account separately.
+- The group export marks people without an account (`placeholder`).
+
+### Security
+
+- People without an account cannot log in, never count as the admin a group needs, and are deleted with their group. A group whose only other members are people without an account is deleted with the last account, as before.
+- E-mail addresses are checked strictly (no whitespace, so no header injection) and stored in lower case; a confirmation or reset link only works once and only the newest one per account.
+
+### Upgrade notes
+
+- Migration `0004` runs automatically (e-mail address and placeholder flag for accounts, personal links, pending confirmations). Nothing changes for existing data.
+- E-mail stays off until you set `MAIL_FROM` and `SMTP_HOST`. With `REGISTRATION=open` and e-mail on, registration needs an address and returns `202` with `{"email": …}` instead of logging in right away.
+- API: new `POST /v1/groups/import/check`, `POST /v1/groups/import?member=<id>` (the file as body), `POST /v1/groups/{id}/members`, `POST /v1/groups/{id}/members/{user_id}/invite`, `POST /v1/auth/forgot-password`, `POST`/`DELETE /v1/account/email`, `DELETE /v1/account/email/pending`. `POST /v1/groups/{id}/invites`, `POST /v1/admin/invitations` and `POST /v1/admin/users/{id}/password-reset` take an optional address (`email`, `send_email`). Members have `placeholder` and `link_expires_at`, `/v1/auth/me` has `email` and `email_pending`, `/v1/meta` has `mail`.
+
 ## 0.4.0 – 2026-11-25
 
 Accounts, administration and data rights – what is needed to run fahrma for people you do not know.

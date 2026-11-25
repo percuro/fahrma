@@ -6,7 +6,10 @@ See docs/configuration.md for the full reference.
 
 import logging
 import os
+from dataclasses import dataclass
+from email.utils import parseaddr
 from functools import lru_cache
+from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -174,6 +177,64 @@ def get_limit(name: str) -> int | None:
     return number or None
 
 
+SMTP_SECURITY_MODES = {"starttls": 587, "tls": 465, "none": 25}
+
+
+@dataclass(frozen=True)
+class MailSettings:
+    sender: str
+    host: str | None
+    port: int
+    security: str
+    username: str | None
+    password: str | None
+    # Development and tests: write each mail as a .eml file here instead of sending it
+    directory: Path | None
+
+
+def get_mail_settings() -> MailSettings | None:
+    """E-mail is optional: off unless MAIL_FROM and SMTP_HOST (or MAIL_DIR) are set."""
+    sender = os.getenv("MAIL_FROM", "").strip()
+    host = os.getenv("SMTP_HOST", "").strip() or None
+    directory = os.getenv("MAIL_DIR", "").strip() or None
+    if not sender and not host and not directory:
+        return None
+    if not sender:
+        raise ConfigError("MAIL_FROM is not set, e.g. MAIL_FROM=fahrma <noreply@example.org>")
+    if not host and not directory:
+        raise ConfigError("MAIL_FROM is set but SMTP_HOST is not; set both to send e-mail")
+    if "\n" in sender or "\r" in sender or "@" not in parseaddr(sender)[1]:
+        raise ConfigError(f"MAIL_FROM is not an e-mail address (got {sender!r})")
+    security = os.getenv("SMTP_SECURITY", "").strip().lower() or "starttls"
+    if security not in SMTP_SECURITY_MODES:
+        raise ConfigError(f"SMTP_SECURITY must be starttls, tls or none (got {security!r})")
+    port_text = os.getenv("SMTP_PORT", "").strip()
+    try:
+        port = int(port_text) if port_text else SMTP_SECURITY_MODES[security]
+    except ValueError as exc:
+        raise ConfigError(f"SMTP_PORT must be a number (got {port_text!r})") from exc
+    password = os.getenv("SMTP_PASSWORD", "") or None
+    password_file = os.getenv("SMTP_PASSWORD_FILE", "").strip()
+    if password_file:
+        try:
+            password = Path(password_file).read_text(encoding="utf-8").strip()
+        except OSError as exc:
+            raise ConfigError(f"SMTP_PASSWORD_FILE cannot be read: {exc}") from exc
+    return MailSettings(
+        sender=sender,
+        host=host,
+        port=port,
+        security=security,
+        username=os.getenv("SMTP_USERNAME", "").strip() or None,
+        password=password,
+        directory=Path(directory) if directory else None,
+    )
+
+
+def mail_enabled() -> bool:
+    return get_mail_settings() is not None
+
+
 def validate() -> None:
     """Fail fast at startup with a readable message instead of on the first request."""
     get_public_url()
@@ -182,3 +243,4 @@ def validate() -> None:
     get_operator_links()
     for name in LIMIT_NAMES:
         get_limit(name)
+    get_mail_settings()

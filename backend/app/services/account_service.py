@@ -163,12 +163,15 @@ class AccountService:
             select(Membership).where(Membership.user_id == user.id, Membership.active.is_(True))
         ).all()
         for membership in own:
+            # Placeholders cannot look after a group, so they do not keep it alive
             others = self.db.scalars(
                 select(Membership)
+                .join(User, User.id == Membership.user_id)
                 .where(
                     Membership.group_id == membership.group_id,
                     Membership.user_id != user.id,
                     Membership.active.is_(True),
+                    User.placeholder.is_(False),
                 )
                 .order_by(Membership.created_at, Membership.id)
             ).all()

@@ -4,7 +4,7 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.4 – accounts, administration and data rights. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
+> Status: 0.5 – moving groups between instances, people without an account, optional e-mail. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
@@ -13,12 +13,14 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 - **Fair rate per km** per car and period, calculated from the actual fuel costs. Fuel without driven km carries over to the next period.
 - **Settlements** freeze a period, show at most n−1 transfers, and let the people involved tick them off. Only the latest settlement can be undone.
 - **Checks instead of surprises:** overlapping odometer readings are rejected, gaps are shown and must be confirmed, running trips block settling.
-- **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. Audit log of every change, CSV and complete JSON export.
+- **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. People who do not want an account can be added by name; the others record for them, and a personal link lets them take over later. Audit log of every change, CSV and complete JSON export.
+- **Move freely:** export a group as JSON and import it on another instance – self-hosted to hosted and back – with every entry and settlement intact.
+- **Optional e-mail:** forgot password, confirmed addresses, invitations by mail, registration with address confirmation. Without it, everything works with links.
 - **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up.
 - **Instance administration:** accounts, roles, invitation and password-reset links – without seeing anybody's trips. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
 - **German and English**, currency and time zone per group.
 - **Installable web app** for iPhone, Android and desktop, light and dark.
-- **Small footprint:** one container, one SQLite file, no external services.
+- **Small footprint:** one container, one SQLite file, no external services (a mail server only if you want e-mail).
 
 How exactly it calculates: [docs/calculation.md](docs/calculation.md).
 
@@ -44,7 +46,6 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 ## Roadmap
 
-- **0.5** moving groups between instances (JSON import), optional e-mail (verification, forgotten password, invitations)
 - **0.6** offline drafts (underground car parks), consumption and cost statistics per car
 - **0.7** reservation calendar, reminders via Web Push
 - **0.8** login via OpenID Connect

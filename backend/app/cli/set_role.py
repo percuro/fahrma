@@ -20,7 +20,7 @@ def main() -> None:
     try:
         repository = AuthRepository(db)
         user = repository.get_user_by_username(args.username)
-        if user is None or user.is_deleted:
+        if user is None or user.is_deleted or user.placeholder:
             raise SystemExit(f"Account {args.username!r} not found")
         if args.role == ROLE_USER and user.is_admin and repository.count_active_admins(exclude_user_id=user.id) == 0:
             raise SystemExit("This is the last active admin; make another account admin first")

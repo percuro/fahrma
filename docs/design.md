@@ -30,9 +30,21 @@ The interface is German and English; each person picks a language or follows the
 
 A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. Instance admins manage accounts, never contents: the administration page shows names, roles and activity, but no groups' trips or amounts.
 
+## People without an account
+
+Not everyone in a shared car wants an app: a grandmother, a teenager, a neighbour who drives twice a year. A group admin can add such a person by name; the others record their trips and payments, and the calculation treats them like any member. If the person wants to join later, a personal link lets them take over the place: a new account simply becomes that member, an existing account takes over every booking in that group, including the frozen settlements. Placeholders cannot log in, never count as the group's admin, and disappear with their group.
+
+## Moving between instances
+
+A group is not tied to the server it started on. The complete JSON export (`fahrma-group/1`) contains every row of the group; importing it on another instance renumbers everything – IDs in frozen settlement snapshots included – so the numbers stay exactly as they were. The file is checked strictly before anything is stored: every reference must point into the file, so an import can never touch another group. Whoever imports picks themselves among the members; everyone else becomes a person without an account until they use a personal link. This is what makes moving from self-hosting to a hosted service (and back) a matter of two clicks.
+
+## E-mail is optional
+
+Every link works without e-mail: an admin copies it and passes it on. With a mail server configured, the same links can go by mail, people confirm an address and get a new password themselves. Mails are plain text, sent after the response, and requests that start from an address answer the same whether it exists or not. An address only counts once its confirmation link was used, so a typo never locks anyone out or sends their reset links to a stranger.
+
 ## Links that do not leak
 
-Invitation and password-reset links carry their token after `#`. Browsers never send that part to the server, so it does not end up in access logs of the app or a reverse proxy. Only a hash of the token is stored, a link works once, and wrong tokens are rate-limited.
+Invitation, password-reset and confirmation links carry their token after `#`. Browsers never send that part to the server, so it does not end up in access logs of the app or a reverse proxy. Only a hash of the token is stored, a link works once, and wrong tokens are rate-limited.
 
 ## Not losing input
 

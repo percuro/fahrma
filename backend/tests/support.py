@@ -15,8 +15,9 @@ from app.db.database import Base, configure_sqlite, get_db
 from app.main import app
 from app.repositories.auth_repository import AuthRepository
 from app.services.auth_service import AuthService
-from app.services.invitation_service import invitation_rate_limiter
+from app.services.invitation_service import invitation_rate_limiter, reset_account_limiter, reset_ip_limiter
 from app.services.login_rate_limiter import login_rate_limiter
+from app.services.mail import account_mail_limiter
 
 PASSWORD = "sicheres-passwort-123"
 TEST_ORIGIN = "http://localhost:5173"
@@ -30,6 +31,10 @@ TEST_ENV = {
     "CORS_ORIGINS": "",
     "DEFAULT_TIMEZONE": "",
     "APP_TZ": "",
+    # E-mail off unless a test turns it on (MailOutbox)
+    "MAIL_FROM": "",
+    "SMTP_HOST": "",
+    "MAIL_DIR": "",
 }
 HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 
@@ -43,7 +48,14 @@ class ApiTestEnvironment:
         configure_sqlite(self.engine)
         Base.metadata.create_all(self.engine)
         self.SessionLocal = sessionmaker(bind=self.engine, autoflush=False)
-        for limiter in (login_rate_limiter, invitation_rate_limiter, register_rate_limiter):
+        for limiter in (
+            login_rate_limiter,
+            invitation_rate_limiter,
+            register_rate_limiter,
+            reset_ip_limiter,
+            reset_account_limiter,
+            account_mail_limiter,
+        ):
             limiter.reset()
 
         def _db():
