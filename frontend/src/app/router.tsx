@@ -12,6 +12,8 @@ import { SettlementPage } from '../pages/SettlementPage';
 import { SettlementDetailPage } from '../pages/SettlementDetailPage';
 import { GroupPage } from '../pages/GroupPage';
 import { ProfilePage } from '../pages/ProfilePage';
+import { RegisterPage } from '../pages/RegisterPage';
+import { AdminPage } from '../pages/AdminPage';
 
 const legacy = ['fahrt/*', 'tanken/*', 'kosten/*', 'verlauf', 'abrechnung', 'abrechnung/*', 'gruppe'].map((path) => ({
   path: `g/:groupId/${path}`,
@@ -19,15 +21,18 @@ const legacy = ['fahrt/*', 'tanken/*', 'kosten/*', 'verlauf', 'abrechnung', 'abr
 }));
 
 export const router = createBrowserRouter([
-  // Invitation: reachable without login (registration)
-  { path: '/invite/:token', element: <InvitePage /> },
+  // One-time links (token in the fragment) and registration: reachable without login
+  { path: '/invite', element: <InvitePage /> },
+  { path: '/invite/:token', element: <LegacyInviteRedirect /> },
   { path: '/einladung/:token', element: <LegacyInviteRedirect /> },
+  { path: '/register', element: <RegisterPage /> },
   {
     path: '/',
     element: <AppLayout />,
     children: [
       { index: true, element: <StartPage /> },
       { path: 'profile', element: <ProfilePage /> },
+      { path: 'admin', element: <AdminPage /> },
       { path: 'g/:groupId', element: <DashboardPage /> },
       { path: 'g/:groupId/trip/new', element: <TripFormPage /> },
       { path: 'g/:groupId/trip/:tripId', element: <TripFormPage /> },

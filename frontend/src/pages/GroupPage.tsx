@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { apiUrl, errorText } from '../lib/api';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { apiFetch, apiUrl, errorText } from '../lib/api';
 import { APP_NAME } from '../app/brand';
 import { parseKm } from '../lib/format';
 import type { Car, EnergyUnit, Group } from '../lib/types';
@@ -29,6 +30,7 @@ export function GroupPage() {
       {isAdmin && <GroupSettings group={data} />}
       <DataExport />
       <AuditLog />
+      {isAdmin && <DeleteGroup group={data} />}
     </>
   );
 }
@@ -55,9 +57,13 @@ function Members() {
           <li key={m.user_id} className="row wrap">
             <span className="main">
               <span className="title">{m.display_name}</span>
-              <div className="meta">{[`@${m.username}`, m.role === 'admin' && g.admin, !m.active && g.left].filter(Boolean).join(' · ')}</div>
+              <div className="meta">
+                {(m.deleted ? [g.deletedAccount] : [`@${m.username}`, m.role === 'admin' && g.admin, !m.active && g.left])
+                  .filter(Boolean)
+                  .join(' · ')}
+              </div>
             </span>
-            {isAdmin && m.user_id !== me.id && (
+            {isAdmin && m.user_id !== me.id && !m.deleted && (
               <span className="chips">
                 <button type="button" className="button small"
                   onClick={() => update.mutate({ userId: m.user_id, role: m.role === 'admin' ? 'member' : 'admin' })}>
@@ -282,9 +288,11 @@ function DataExport() {
   return (
     <section>
       <h2>{t.group.data}</h2>
-      <p>
+      <p className="button-row">
         <a className="button" href={apiUrl(`/v1/groups/${gid}/export.csv?lang=${lang}`)} download>{t.group.csv}</a>
+        <a className="button" href={apiUrl(`/v1/groups/${gid}/export.json`)} download>{t.group.json}</a>
       </p>
+      <p className="subtle small">{t.group.jsonHint}</p>
     </section>
   );
 }
@@ -320,5 +328,44 @@ function AuditList() {
         </li>
       ))}
     </ul>
+  );
+}
+
+function DeleteGroup({ group }: { group: Group }) {
+  const t = useT();
+  const g = t.group;
+  const { toast } = useFeedback();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [name, setName] = useState('');
+  // Not useGroupMutation: refetching the deleted group would flash "not found"
+  const remove = useMutation({
+    mutationFn: () => apiFetch<void>(`/v1/groups/${group.id}`, { method: 'DELETE', body: JSON.stringify({ name }) }),
+    onSuccess: async () => {
+      toast(g.deleted);
+      navigate('/', { replace: true });
+      queryClient.removeQueries({ queryKey: ['group', group.id] });
+      await queryClient.invalidateQueries({ queryKey: ME_KEY });
+    },
+  });
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    remove.mutate();
+  };
+  return (
+    <details className="card danger-zone">
+      <summary><h2 className="inline">{g.deleteTitle}</h2></summary>
+      <form className="form mt-1" onSubmit={submit}>
+        <p className="m-0">{g.deleteIntro}</p>
+        <label className="field">
+          <span>{g.deleteConfirmName(group.name)}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} required autoComplete="off" />
+        </label>
+        {remove.isError && <p className="error" role="alert">{errorText(remove.error)}</p>}
+        <button type="submit" className="button primary danger" disabled={remove.isPending || name.trim() !== group.name.trim()}>
+          {g.deleteSubmit}
+        </button>
+      </form>
+    </details>
   );
 }

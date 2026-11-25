@@ -1,56 +1,85 @@
-import { useState, type ChangeEvent, type FormEvent } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { useState, type FormEvent } from 'react';
+import { Link, Navigate, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
-import type { Me } from '../lib/types';
+import type { InvitationInfo, Me } from '../lib/types';
 import { ME_KEY, useMe } from '../hooks/useMe';
-import { useT } from '../i18n';
+import { useI18n, useT } from '../i18n';
 import { Loading } from '../components/Status';
+import { LegalLinks } from '../components/LegalLinks';
+import { AccountFields } from '../components/AccountFields';
+import { useAccountForm } from '../components/account-form';
 import { LoginPage } from './LoginPage';
 
+interface Accepted {
+  kind: InvitationInfo['kind'];
+  group_id: number | null;
+}
+
+/**
+ * One page for every one-time link: PUBLIC_URL/invite#<token>.
+ * The token is in the URL fragment, which browsers never send to the server.
+ */
 export function InvitePage() {
   const t = useT();
-  const { token = '' } = useParams();
+  const { hash } = useLocation();
+  const token = decodeURIComponent(hash.replace(/^#/, ''));
   const me = useMe();
   const [haveAccount, setHaveAccount] = useState(false);
-  const invite = useQuery({
+  const info = useQuery({
     queryKey: ['invite', token],
-    queryFn: () => apiFetch<{ group_name: string; valid: boolean }>(`/v1/invites/${encodeURIComponent(token)}`),
+    queryFn: () => apiFetch<InvitationInfo>('/v1/invites/inspect', { method: 'POST', body: JSON.stringify({ token }) }),
+    enabled: token.length > 0,
+    retry: false,
+    staleTime: Infinity,
   });
 
-  if (invite.isPending || me.isPending) return <main className="center"><Loading /></main>;
-  if (invite.isError || !invite.data?.valid) {
+  if (token && (info.isPending || me.isPending)) return <main className="center"><Loading /></main>;
+  if (!token || info.isError || !info.data) {
     return (
       <main className="center">
-        <p role="alert">{t.invite.invalid}</p>
+        <p role="alert">{info.isError ? errorText(info.error) : t.invite.invalid}</p>
         <Link to="/" className="button">{t.app.toStart}</Link>
       </main>
     );
   }
-  const groupName = invite.data.group_name;
-  if (me.data) return <Accept token={token} groupName={groupName} me={me.data} />;
+  const invitation = info.data;
+  if (invitation.kind === 'password_reset') return <SetPassword token={token} username={invitation.username ?? ''} />;
+  if (invitation.kind === 'signup') return <NewAccount token={token} title={t.invite.signupTitle} intro={t.invite.signupIntro} submit={t.invite.signupSubmit} />;
+  const groupName = invitation.group_name ?? '';
+  if (me.data) return <Join token={token} groupName={groupName} me={me.data} />;
   if (haveAccount) return <LoginPage title={t.invite.loginToJoin(groupName)} />;
-  return <Register token={token} groupName={groupName} onHaveAccount={() => setHaveAccount(true)} />;
+  return (
+    <NewAccount token={token} title={t.invite.titleFor(groupName)} intro={t.invite.createAccount} submit={t.invite.submit}
+      onHaveAccount={() => setHaveAccount(true)} />
+  );
 }
 
-function Accept({ token, groupName, me }: { token: string; groupName: string; me: Me }) {
-  const t = useT();
+function useAccept(token: string) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const accept = useMutation({
-    mutationFn: () => apiFetch<{ group_id: number }>(`/v1/invites/${encodeURIComponent(token)}/accept`, { method: 'POST' }),
+  return useMutation({
+    mutationFn: (fields: Record<string, unknown>) =>
+      apiFetch<Accepted>('/v1/invites/accept', { method: 'POST', body: JSON.stringify({ token, ...fields }) }),
     onSuccess: async ({ group_id }) => {
+      // Leave the page first: asking about the used-up link again would count as a wrong token
+      navigate(group_id ? `/g/${group_id}` : '/', { replace: true });
       await queryClient.invalidateQueries({ queryKey: ME_KEY });
-      navigate(`/g/${group_id}`);
+      queryClient.removeQueries({ queryKey: ['invite', token] });
     },
   });
+}
+
+function Join({ token, groupName, me }: { token: string; groupName: string; me: Me }) {
+  const t = useT();
+  const accept = useAccept(token);
   return (
     <main className="center">
       <div className="card login">
         <h1>{t.invite.title}</h1>
         <p>{t.invite.joinQuestion(me.display_name, groupName)}</p>
         {accept.isError && <p className="error" role="alert">{errorText(accept.error)}</p>}
-        <button type="button" className="button primary" onClick={() => accept.mutate()} disabled={accept.isPending}>
+        <button type="button" className="button primary" onClick={() => accept.mutate({})} disabled={accept.isPending}>
           {t.invite.join}
         </button>
       </div>
@@ -58,64 +87,62 @@ function Accept({ token, groupName, me }: { token: string; groupName: string; me
   );
 }
 
-function Register({ token, groupName, onHaveAccount }: { token: string; groupName: string; onHaveAccount: () => void }) {
+function NewAccount({ token, title, intro, submit, onHaveAccount }: {
+  token: string;
+  title: string;
+  intro: string;
+  submit: string;
+  onHaveAccount?: () => void;
+}) {
   const t = useT();
-  const navigate = useNavigate();
-  const queryClient = useQueryClient();
-  const [form, setForm] = useState({ username: '', display_name: '', password: '', repeat: '' });
-  const [localError, setLocalError] = useState('');
-  const register = useMutation({
-    mutationFn: () =>
-      apiFetch<Me>('/v1/auth/register', {
-        method: 'POST',
-        body: JSON.stringify({ token, username: form.username, display_name: form.display_name, password: form.password }),
-      }),
-    onSuccess: (me) => {
-      queryClient.setQueryData(ME_KEY, me);
-      navigate(me.groups.length ? `/g/${me.groups[0].id}` : '/');
-    },
-  });
-  const submit = (event: FormEvent) => {
+  const { lang } = useI18n();
+  const form = useAccountForm();
+  const accept = useAccept(token);
+  const onSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (form.password.length < 12) return setLocalError(t.auth.passwordTooShort);
-    if (form.password !== form.repeat) return setLocalError(t.auth.passwordMismatch);
-    setLocalError('');
-    register.mutate();
+    if (form.validate()) accept.mutate({ ...form.body(), locale: lang });
   };
-  const set = (key: keyof typeof form) => (e: ChangeEvent<HTMLInputElement>) => setForm({ ...form, [key]: e.target.value });
-  const error = localError || (register.isError ? errorText(register.error) : '');
+  const error = form.error || (accept.isError ? errorText(accept.error) : '');
   return (
     <main className="center">
-      <form className="card login" onSubmit={submit}>
-        <h1>{t.invite.titleFor(groupName)}</h1>
-        <p className="subtle m-0">{t.invite.createAccount}</p>
-        <label className="field">
-          <span>{t.invite.displayName}</span>
-          <input value={form.display_name} onChange={set('display_name')} required maxLength={80} autoComplete="given-name" />
-        </label>
-        <label className="field">
-          <span>{t.invite.username}</span>
-          <input value={form.username} onChange={set('username')} required minLength={2} maxLength={80}
-            pattern="[A-Za-z0-9._\-]+" title={t.auth.usernameHint} autoCapitalize="none" autoComplete="username" />
-        </label>
-        <label className="field">
-          <span>{t.invite.password}</span>
-          <input type="password" value={form.password} onChange={set('password')} required autoComplete="new-password" />
-        </label>
-        <label className="field">
-          <span>{t.auth.passwordRepeat}</span>
-          <input type="password" value={form.repeat} onChange={set('repeat')} required autoComplete="new-password" />
-        </label>
+      <form className="card login" onSubmit={onSubmit}>
+        <h1>{title}</h1>
+        <p className="subtle m-0">{intro}</p>
+        <AccountFields form={form} />
         {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" className="button primary" disabled={register.isPending}>{t.invite.submit}</button>
-        <button type="button" className="link-button" onClick={onHaveAccount}>{t.invite.haveAccount}</button>
+        <button type="submit" className="button primary" disabled={accept.isPending}>{submit}</button>
+        {onHaveAccount && <button type="button" className="link-button" onClick={onHaveAccount}>{t.invite.haveAccount}</button>}
+        <LegalLinks />
       </form>
     </main>
   );
 }
 
-/** Invitation links from 0.1 used a German path (/einladung/…). */
+function SetPassword({ token, username }: { token: string; username: string }) {
+  const t = useT();
+  const form = useAccountForm();
+  const accept = useAccept(token);
+  const onSubmit = (event: FormEvent) => {
+    event.preventDefault();
+    if (form.validate({ passwordOnly: true })) accept.mutate({ password: form.values.password });
+  };
+  const error = form.error || (accept.isError ? errorText(accept.error) : '');
+  return (
+    <main className="center">
+      <form className="card login" onSubmit={onSubmit}>
+        <h1>{t.invite.resetTitle}</h1>
+        <p className="subtle m-0">{t.invite.resetIntro(username)}</p>
+        <input type="text" name="username" value={username} autoComplete="username" readOnly hidden />
+        <AccountFields form={form} passwordOnly passwordLabel={t.invite.newPassword} />
+        {error && <p className="error" role="alert">{error}</p>}
+        <button type="submit" className="button primary" disabled={accept.isPending}>{t.invite.resetSubmit}</button>
+      </form>
+    </main>
+  );
+}
+
+/** Links before 0.4 carried the token in the path (/invite/<token>, /einladung/<token>). */
 export function LegacyInviteRedirect() {
   const { token } = useParams();
-  return <Navigate to={`/invite/${token ?? ''}`} replace />;
+  return <Navigate to={{ pathname: '/invite', hash: token ?? '' }} replace />;
 }

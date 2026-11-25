@@ -9,6 +9,7 @@ export interface Me {
   username: string;
   display_name: string;
   locale: 'de' | 'en' | null;
+  role: 'admin' | 'user';
   groups: GroupBrief[];
   today: string;
   timezone: string;
@@ -20,6 +21,8 @@ export interface Member {
   display_name: string;
   role: 'admin' | 'member';
   active: boolean;
+  /** The account was deleted; its bookings stay under an anonymous name */
+  deleted: boolean;
 }
 
 export interface Group {
@@ -204,4 +207,62 @@ export interface AuditEntry {
   action: string;
   diff: Record<string, unknown> | null;
   created_at: string;
+}
+
+export interface Meta {
+  version: string;
+  registration: 'invite' | 'open';
+  setup_needed: boolean;
+  links: { imprint_url: string | null; privacy_url: string | null; terms_url: string | null };
+  limits: { groups_per_user: number | null; members_per_group: number | null; cars_per_group: number | null };
+}
+
+export interface DeviceSession {
+  id: number;
+  created_at: string;
+  last_seen_at: string | null;
+  device: string | null;
+  current: boolean;
+}
+
+export interface DeletionPreview {
+  groups_deleted: { id: number; name: string }[];
+  admin_handover: { group_id: number; group_name: string; new_admin_name: string }[];
+  groups_kept: { id: number; name: string }[];
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  display_name: string;
+  role: 'admin' | 'user';
+  is_active: boolean;
+  created_at: string;
+  last_seen_at: string | null;
+  group_count: number;
+}
+
+export interface InvitationCreated {
+  id: number;
+  purpose: 'signup' | 'password_reset';
+  url: string;
+  expires_at: string;
+}
+
+export interface InvitationRead {
+  id: number;
+  purpose: 'signup' | 'password_reset';
+  role: 'admin' | 'user' | null;
+  note: string | null;
+  target_username: string | null;
+  created_by_username: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+export interface InvitationInfo {
+  kind: 'group' | 'signup' | 'password_reset';
+  group_name: string | null;
+  username: string | null;
+  expires_at: string;
 }
