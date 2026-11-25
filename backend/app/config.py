@@ -124,7 +124,61 @@ def get_default_timezone() -> ZoneInfo:
         raise ConfigError(f"Unknown time zone {name!r} in DEFAULT_TIMEZONE") from exc
 
 
+REGISTRATION_MODES = ("invite", "open")
+
+
+def get_registration_mode() -> str:
+    """invite (default): accounts only through an invitation; open: anyone may register."""
+    value = os.getenv("REGISTRATION", "").strip().lower() or "invite"
+    if value not in REGISTRATION_MODES:
+        raise ConfigError(f"REGISTRATION must be 'invite' or 'open' (got {value!r})")
+    return value
+
+
+def get_invite_expiry_days() -> int:
+    return env_positive_int("INVITE_EXPIRY_DAYS", 7)
+
+
+def _optional_url(name: str) -> str | None:
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    if urlsplit(value).scheme not in {"http", "https"}:
+        raise ConfigError(f"{name} must start with http:// or https:// (got {value!r})")
+    return value
+
+
+def get_operator_links() -> dict[str, str | None]:
+    """Imprint, privacy policy and terms of the operator; shown in the app when set."""
+    return {
+        "imprint_url": _optional_url("IMPRINT_URL"),
+        "privacy_url": _optional_url("PRIVACY_URL"),
+        "terms_url": _optional_url("TERMS_URL"),
+    }
+
+
+LIMIT_NAMES = ("MAX_GROUPS_PER_USER", "MAX_MEMBERS_PER_GROUP", "MAX_CARS_PER_GROUP")
+
+
+def get_limit(name: str) -> int | None:
+    """A limit from the environment; empty or 0 = unlimited."""
+    value = os.getenv(name, "").strip()
+    if not value:
+        return None
+    try:
+        number = int(value)
+    except ValueError as exc:
+        raise ConfigError(f"{name} must be a whole number (got {value!r})") from exc
+    if number < 0:
+        raise ConfigError(f"{name} must not be negative (got {value!r})")
+    return number or None
+
+
 def validate() -> None:
     """Fail fast at startup with a readable message instead of on the first request."""
     get_public_url()
     get_default_timezone()
+    get_registration_mode()
+    get_operator_links()
+    for name in LIMIT_NAMES:
+        get_limit(name)

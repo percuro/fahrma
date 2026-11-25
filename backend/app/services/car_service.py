@@ -7,6 +7,7 @@ from app.models.trip import Trip
 from app.schemas.car import CarCreate, CarUpdate
 from app.services.access import GroupContext
 from app.services.audit_service import record
+from app.services.limits import check_new_car
 
 
 def get_car(ctx: GroupContext, car_id: int) -> Car:
@@ -38,6 +39,7 @@ def list_cars(ctx: GroupContext) -> list[dict]:
 
 def create_car(ctx: GroupContext, data: CarCreate) -> dict:
     ctx.require_admin()
+    check_new_car(ctx.db, ctx.group.id)
     car = Car(group_id=ctx.group.id, **data.model_dump())
     ctx.db.add(car)
     ctx.db.flush()
@@ -57,6 +59,8 @@ def update_car(ctx: GroupContext, car_id: int, data: CarUpdate) -> dict:
             f"There are already trips from km {first_start}",
             km=first_start,
         )
+    if car.archived and not data.archived:
+        check_new_car(ctx.db, ctx.group.id)
     for key, value in data.model_dump().items():
         setattr(car, key, value)
     record(ctx, "car", car.id, "update", data.model_dump())

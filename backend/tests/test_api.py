@@ -2,7 +2,7 @@ import unittest
 from datetime import date
 
 from app import __version__
-from tests.support import PASSWORD, TEST_ORIGIN, ApiTestEnvironment
+from tests.support import PASSWORD, TEST_ORIGIN, ApiTestEnvironment, accept, token_of
 
 
 class GroupSetupMixin:
@@ -10,19 +10,16 @@ class GroupSetupMixin:
 
     def setUp(self):
         self.env = ApiTestEnvironment()
-        self.env.create_user("alex", display_name="Alex")
+        self.env.create_user("alex", display_name="Alex", role="admin")
         self.alex = self.env.client("alex")
         group = self.alex.post("/v1/groups", json={"name": "Test group"}).json()
         self.gid = group["id"]
         self.alex_id = group["members"][0]["user_id"]
         invite = self.alex.post(f"/v1/groups/{self.gid}/invites").json()
         self.sam = self.env.client(None)
-        response = self.sam.post(
-            "/v1/auth/register",
-            json={"token": invite["token"], "username": "sam", "display_name": "Sam", "password": PASSWORD},
-        )
-        assert response.status_code == 201, response.text
-        self.sam_id = response.json()["id"]
+        response = accept(self.sam, invite["url"], username="sam", display_name="Sam", password=PASSWORD)
+        assert response.status_code == 200, response.text
+        self.sam_id = self.sam.get("/v1/auth/me").json()["id"]
         car = self.alex.post(
             f"/v1/groups/{self.gid}/cars", json={"name": "Test car", "plate": "TEST-1", "start_odometer_km": 10000}
         )
@@ -71,17 +68,13 @@ class AuthAndGroupTests(GroupSetupMixin, unittest.TestCase):
 
     def test_invite_is_single_use(self):
         invite = self.alex.post(f"{self.base}/invites").json()
-        self.assertTrue(self.env.client(None).get(f"/v1/invites/{invite['token']}").json()["valid"])
-        first = self.env.client(None).post(
-            "/v1/auth/register",
-            json={"token": invite["token"], "username": "kim", "display_name": "Kim", "password": PASSWORD},
-        )
-        self.assertEqual(first.status_code, 201)
-        second = self.env.client(None).post(
-            "/v1/auth/register",
-            json={"token": invite["token"], "username": "eve", "display_name": "Eve", "password": PASSWORD},
-        )
-        self.assertEqual(second.status_code, 410)
+        info = self.env.client(None).post("/v1/invites/inspect", json={"token": token_of(invite["url"])}).json()
+        self.assertEqual((info["kind"], info["group_name"]), ("group", "Test group"))
+        first = accept(self.env.client(None), invite["url"], username="kim", display_name="Kim", password=PASSWORD)
+        self.assertEqual(first.json(), {"kind": "group", "group_id": self.gid})
+        second = accept(self.env.client(None), invite["url"], username="eve", display_name="Eve", password=PASSWORD)
+        self.assertEqual(second.status_code, 404)
+        self.assertEqual(second.json()["detail"]["code"], "invite_invalid")
 
     def test_members_cannot_invite_or_add_cars(self):
         self.assertEqual(self.sam.post(f"{self.base}/invites").status_code, 403)
@@ -341,11 +334,8 @@ class ErrorCodeTests(GroupSetupMixin, unittest.TestCase):
 
     def test_register_password_too_short(self):
         invite = self.alex.post(f"{self.base}/invites").json()
-        self.assertTrue(invite["url"].endswith(f"/invite/{invite['token']}"))
-        response = self.env.client(None).post(
-            "/v1/auth/register",
-            json={"token": invite["token"], "username": "kim", "display_name": "Kim", "password": "short"},
-        )
+        self.assertTrue(invite["url"].startswith(f"{TEST_ORIGIN}/invite#"))
+        response = accept(self.env.client(None), invite["url"], username="kim", display_name="Kim", password="short")
         detail = self.detail(response, 422)
         self.assertEqual(detail["code"], "password_too_short")
         self.assertEqual(detail["params"], {"min_length": 12})

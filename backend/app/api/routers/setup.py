@@ -10,6 +10,7 @@ from app.api.dependencies.clock import get_today
 from app.api.routers.auth import me_response
 from app.db.database import get_db
 from app.errors import AppError
+from app.models.user import ROLE_ADMIN
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import MeRead
 from app.services import setup_service
@@ -60,9 +61,9 @@ def run_setup(
         if not setup_service.needs_setup(db):
             raise _already_done()
         try:
-            user = service.create_user(data.username, data.password, data.display_name)
+            user = service.create_user(data.username, data.password, data.display_name, role=ROLE_ADMIN)
         except AccountError as exc:
             raise exc.to_http() from exc
     setup_service.clear_token()
-    service.start_session(user, response)
+    service.start_session(user, request, response)
     return me_response(db, user, today)

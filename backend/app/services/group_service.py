@@ -1,24 +1,25 @@
 import secrets
 from datetime import date, timedelta
 
-from fastapi import Response, status
+from fastapi import status
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.config import get_default_timezone_name, get_public_url, is_valid_timezone
+from app.config import get_default_timezone_name, get_invite_expiry_days, get_public_url, is_valid_timezone
 from app.errors import AppError
+from app.models.audit import AuditEntry
+from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
-from app.models.group import ROLE_ADMIN, ROLE_MEMBER, Group, Invite, Membership
-from app.models.trip import Trip, TripExternalPayment
+from app.models.group import ROLE_ADMIN, Group, Invite, Membership
+from app.models.settlement import Settlement, SettlementTransfer
+from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
-from app.repositories.auth_repository import AuthRepository
-from app.schemas.auth import RegisterRequest
 from app.schemas.group import GroupUpdate
 from app.services.access import GroupContext
 from app.services.audit_service import record
-from app.services.auth_service import AccountError, AuthService, utcnow
-
-INVITE_DAYS = 7
+from app.services.auth_service import AuthService, utcnow
+from app.services.limits import check_new_group, check_new_member
 
 
 def groups_of(db: Session, user: User) -> list[dict]:
@@ -33,6 +34,7 @@ def groups_of(db: Session, user: User) -> list[dict]:
 
 
 def create_group(db: Session, user: User, name: str) -> Group:
+    check_new_group(db, user.id)
     group = Group(name=name.strip())
     db.add(group)
     db.flush()
@@ -65,6 +67,7 @@ def group_read(ctx: GroupContext, today: date) -> dict:
                 "display_name": user.display_name,
                 "role": membership.role,
                 "active": membership.active,
+                "deleted": user.is_deleted,
             }
             for membership, user in rows
         ],
@@ -114,6 +117,11 @@ def update_member(ctx: GroupContext, user_id: int, role: str | None, active: boo
     )
     if membership is None:
         raise AppError(status.HTTP_404_NOT_FOUND, "member_not_found", "Member not found")
+    if membership.user.is_deleted and (active or role == ROLE_ADMIN):
+        raise AppError(status.HTTP_409_CONFLICT, "member_deleted", "This account has been deleted")
+    if active and not membership.active:
+        check_new_member(ctx.db, ctx.group.id)
+        check_new_group(ctx.db, user_id)
     if role is not None:
         membership.role = role
     if active is not None:
@@ -136,9 +144,10 @@ def update_member(ctx: GroupContext, user_id: int, role: str | None, active: boo
 
 
 def create_invite(ctx: GroupContext) -> dict:
+    """One-time link into the group: PUBLIC_URL/invite#<token> (the token never reaches server logs)."""
     ctx.require_admin()
-    token = secrets.token_urlsafe(24)
-    expires_at = utcnow() + timedelta(days=INVITE_DAYS)
+    token = secrets.token_urlsafe(32)
+    expires_at = utcnow() + timedelta(days=get_invite_expiry_days())
     invite = Invite(
         group_id=ctx.group.id,
         token_hash=AuthService.hash_token(token),
@@ -149,56 +158,36 @@ def create_invite(ctx: GroupContext) -> dict:
     ctx.db.flush()
     record(ctx, "invite", invite.id, "create")
     ctx.db.commit()
-    return {"url": f"{get_public_url()}/invite/{token}", "token": token, "expires_at": expires_at}
+    return {"url": f"{get_public_url()}/invite#{token}", "expires_at": expires_at}
 
 
-def _valid_invite(db: Session, token: str) -> Invite | None:
-    invite = db.query(Invite).filter(Invite.token_hash == AuthService.hash_token(token)).first()
-    if invite is None or invite.used_at is not None or invite.expires_at <= utcnow():
-        return None
-    return invite
+def delete_group_data(db: Session, group_id: int) -> None:
+    """Delete a group with everything in it, children first (the caller commits).
+
+    Explicit order instead of ON DELETE CASCADE: expenses may point to trips (RESTRICT),
+    and fuel, trips and expenses point to cars and settlements.
+    """
+    trip_ids = select(Trip.id).where(Trip.group_id == group_id)
+    settlement_ids = select(Settlement.id).where(Settlement.group_id == group_id)
+    db.execute(delete(Expense).where(Expense.group_id == group_id))
+    db.execute(delete(FuelEntry).where(FuelEntry.group_id == group_id))
+    db.execute(delete(TripShare).where(TripShare.trip_id.in_(trip_ids)))
+    db.execute(delete(TripExternalPayment).where(TripExternalPayment.trip_id.in_(trip_ids)))
+    db.execute(delete(Trip).where(Trip.group_id == group_id))
+    db.execute(delete(SettlementTransfer).where(SettlementTransfer.settlement_id.in_(settlement_ids)))
+    db.execute(delete(Settlement).where(Settlement.group_id == group_id))
+    db.execute(delete(Car).where(Car.group_id == group_id))
+    db.execute(delete(AuditEntry).where(AuditEntry.group_id == group_id))
+    db.execute(delete(Invite).where(Invite.group_id == group_id))
+    db.execute(delete(Membership).where(Membership.group_id == group_id))
+    db.execute(delete(Group).where(Group.id == group_id))
 
 
-def preview_invite(db: Session, token: str) -> dict:
-    invite = _valid_invite(db, token)
-    if invite is None:
-        return {"group_name": "", "valid": False}
-    return {"group_name": invite.group.name, "valid": True}
-
-
-def _join(db: Session, invite: Invite, user: User) -> None:
-    membership = (
-        db.query(Membership).filter(Membership.group_id == invite.group_id, Membership.user_id == user.id).first()
-    )
-    if membership is None:
-        db.add(Membership(group_id=invite.group_id, user_id=user.id, role=ROLE_MEMBER))
-    else:
-        membership.active = True
-    invite.used_at = utcnow()
-    invite.used_by_user_id = user.id
-
-
-def accept_invite(db: Session, user: User, token: str) -> int:
-    invite = _valid_invite(db, token)
-    if invite is None:
-        raise AppError(status.HTTP_410_GONE, "invite_invalid", "Invitation is invalid or has expired")
-    _join(db, invite, user)
-    db.commit()
-    return invite.group_id
-
-
-def register(db: Session, data: RegisterRequest, response: Response) -> User:
-    invite = _valid_invite(db, data.token)
-    if invite is None:
-        raise AppError(status.HTTP_410_GONE, "invite_invalid", "Invitation is invalid or has expired")
-    service = AuthService(AuthRepository(db))
-    try:
-        user = service.create_user(data.username, data.password, data.display_name, commit=False)
-    except AccountError as exc:
-        db.rollback()
-        raise exc.to_http() from exc
-    _join(db, invite, user)
-    db.commit()
-    db.refresh(user)
-    service.start_session(user, response)
-    return user
+def delete_group(ctx: GroupContext, confirm_name: str) -> None:
+    ctx.require_admin()
+    if confirm_name.strip() != ctx.group.name.strip():
+        raise AppError(
+            status.HTTP_422_UNPROCESSABLE_CONTENT, "group_name_mismatch", "The name does not match the group"
+        )
+    delete_group_data(ctx.db, ctx.group.id)
+    ctx.db.commit()

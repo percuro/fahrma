@@ -1,13 +1,16 @@
 from fastapi import Depends, FastAPI
 
 from app import __version__
-from app.api.dependencies.auth import require_user
+from app.api.dependencies.auth import require_admin, require_user
+from app.api.routers.account import router as account_router
+from app.api.routers.admin import router as admin_router
 from app.api.routers.auth import router as auth_router
 from app.api.routers.cars import router as cars_router
 from app.api.routers.entries import expenses_router, fuel_router, trips_router
-from app.api.routers.groups import invite_router
 from app.api.routers.groups import router as groups_router
 from app.api.routers.health import router as health_router
+from app.api.routers.invitations import router as invitations_router
+from app.api.routers.meta import router as meta_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
 from app.config import APP_NAME, api_docs_enabled
@@ -26,10 +29,13 @@ app.middleware("http")(enforce_csrf)
 
 # Mounted under /api by app.web: /api/v1/groups → /v1/groups here
 app.include_router(health_router)
+app.include_router(meta_router, prefix="/v1", tags=["meta"])
 app.include_router(setup_router, prefix="/v1/setup", tags=["setup"])
 app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
-app.include_router(invite_router, prefix="/v1/invites", tags=["groups"])
+app.include_router(invitations_router, prefix="/v1/invites", tags=["invitations"])
 protected = [Depends(require_user)]
+app.include_router(account_router, prefix="/v1/account", tags=["account"], dependencies=protected)
+app.include_router(admin_router, prefix="/v1/admin", tags=["admin"], dependencies=[Depends(require_admin)])
 app.include_router(groups_router, prefix="/v1/groups", tags=["groups"], dependencies=protected)
 group = "/v1/groups/{group_id}"
 app.include_router(cars_router, prefix=f"{group}/cars", tags=["cars"])

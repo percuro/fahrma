@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from pydantic import BaseModel, Field
 
 
@@ -21,6 +19,8 @@ class MemberRead(BaseModel):
     display_name: str
     role: str
     active: bool
+    # The account was deleted; the bookings stay under an anonymous name
+    deleted: bool = False
 
 
 class MemberUpdate(BaseModel):
@@ -39,12 +39,6 @@ class GroupRead(BaseModel):
     members: list[MemberRead]
 
 
-class InviteCreated(BaseModel):
-    url: str
-    token: str
-    expires_at: datetime
-
-
-class InvitePreview(BaseModel):
-    group_name: str
-    valid: bool
+class GroupDelete(BaseModel):
+    # The group's name, typed again as confirmation
+    name: str = Field(min_length=1, max_length=80)
