@@ -20,6 +20,7 @@ from app.models.audit import AuditEntry
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Invite, Membership
+from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
@@ -91,6 +92,8 @@ def reassign(db: Session, group_id: int, old_user_id: int, new_user_id: int) -> 
         (SettlementTransfer, SettlementTransfer.confirmed_by, SettlementTransfer.settlement_id.in_(settlement_ids)),
         (AuditEntry, AuditEntry.user_id, AuditEntry.group_id == group_id),
         (Invite, Invite.created_by, Invite.group_id == group_id),
+        (Reservation, Reservation.user_id, Reservation.group_id == group_id),
+        (Reservation, Reservation.created_by, Reservation.group_id == group_id),
     ):
         db.execute(update(model).where(scope, column == old_user_id).values({column: new_user_id}))
     db.execute(

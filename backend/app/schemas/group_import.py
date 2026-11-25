@@ -123,6 +123,20 @@ class ImportTransfer(_Row):
     confirmed_by: int | None = None
 
 
+class ImportReservation(_Row):
+    """Since 0.7; times in naive UTC like every timestamp of the file."""
+
+    id: int
+    car_id: int
+    user_id: int
+    starts_at: dt.datetime
+    ends_at: dt.datetime
+    note: str | None = Field(default=None, max_length=200)
+    created_by: int
+    created_at: dt.datetime | None = None
+    updated_at: dt.datetime | None = None
+
+
 class ImportAuditEntry(_Row):
     user_id: int
     entity: str = Field(min_length=1, max_length=20)
@@ -146,6 +160,7 @@ class GroupExportFile(_Row):
     expenses: list[ImportExpense] = []
     settlements: list[ImportSettlement] = []
     settlement_transfers: list[ImportTransfer] = []
+    reservations: list[ImportReservation] = []
     audit_log: list[ImportAuditEntry] = []
 
 
@@ -163,6 +178,7 @@ class ImportCounts(BaseModel):
     fuel: int
     expenses: int
     settlements: int
+    reservations: int = 0
 
 
 class ImportPreview(BaseModel):

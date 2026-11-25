@@ -13,6 +13,7 @@ export function isErrorDetail(value: unknown): value is ErrorDetail {
 
 const KM_PARAMS = new Set(['km', 'start_km', 'end_km', 'from_km', 'to_km']);
 const DATE_PARAMS = new Set(['date', 'previous']);
+const DATE_TIME_PARAMS = new Set(['starts_at', 'ends_at', 'time']);
 
 /** The server sends raw values; texts get them formatted (km with separators, dates in local style). */
 function formatParams(params: Record<string, unknown>, format: Format): Record<string, unknown> {
@@ -20,6 +21,7 @@ function formatParams(params: Record<string, unknown>, format: Format): Record<s
     Object.entries(params).map(([key, value]) => {
       if (KM_PARAMS.has(key) && typeof value === 'number') return [key, format.km(value)];
       if (DATE_PARAMS.has(key) && typeof value === 'string') return [key, format.date(value)];
+      if (DATE_TIME_PARAMS.has(key) && typeof value === 'string') return [key, format.dateTime(value)];
       return [key, value];
     }),
   );

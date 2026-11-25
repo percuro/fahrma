@@ -89,3 +89,19 @@ describe('statistics formats', () => {
     expect(createFormat('en').period('2026-03', true)).toBe('M');
   });
 });
+
+describe('reservation formats', () => {
+  const de = createFormat('de');
+
+  it('formats wall-clock times without the device time zone', () => {
+    expect(de.weekday('2026-12-01')).toBe('Di., 01.12.');
+    expect(de.time('2026-12-01T08:05:00')).toBe('08:05');
+    expect(de.dateTime('2026-12-01T23:30')).toBe('01.12.2026, 23:30');
+  });
+
+  it('keeps a period short when it stays within a day', () => {
+    expect(de.span('2026-12-01T08:00', '2026-12-01T10:30')).toBe('Di., 01.12., 08:00–10:30');
+    expect(de.span('2026-12-01T20:00', '2026-12-02T00:00')).toBe('Di., 01.12., 20:00–24:00');
+    expect(de.span('2026-12-01T20:00', '2026-12-03T09:00')).toBe('Di., 01.12., 20:00 – Do., 03.12., 09:00');
+  });
+});

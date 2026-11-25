@@ -5,6 +5,7 @@ from app.models.fuel import FuelEntry
 from app.models.group import Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
+from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User, UserSession
@@ -19,6 +20,7 @@ __all__ = [
     "Invitation",
     "Invite",
     "Membership",
+    "Reservation",
     "Settlement",
     "SettlementTransfer",
     "Trip",

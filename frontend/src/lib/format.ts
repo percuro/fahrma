@@ -29,6 +29,14 @@ export interface Format {
   per100km(milli: number, km: number, unit: string): string;
   /** Short month name for "2026-03", or the year itself for "2026"; narrow: "M" */
   period(period: string, narrow?: boolean): string;
+  /** Short weekday and date for "2026-12-01": "Di., 01.12." / "Tue 01/12" */
+  weekday(day: string): string;
+  /** Wall-clock time of "2026-12-01T08:00": "08:00" */
+  time(local: string): string;
+  /** Date and time of a wall-clock time: "01.12.2026, 08:00" */
+  dateTime(local: string): string;
+  /** A period of wall-clock times, compact when it stays within one day */
+  span(startsAt: string, endsAt: string): string;
   /** Cents as text for an input field: 1250 → "12,50" */
   moneyInput(cents: number | null | undefined): string;
   quantityInput(milli: number | null | undefined): string;
@@ -36,6 +44,12 @@ export interface Format {
 }
 
 const DASH = '–';
+
+function addOneDay(local: string): string {
+  const date = new Date(`${local.slice(0, 10)}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
 
 export function createFormat(lang: Language, currency = 'EUR'): Format {
   const locale = intlLocale(lang);
@@ -54,6 +68,11 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
   const months = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
   const narrowMonths = new Intl.DateTimeFormat(locale, { month: 'narrow', timeZone: 'UTC' });
   const dates = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+  const weekdays = new Intl.DateTimeFormat(locale, { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+  const times = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
+  const wallClock = (local: string) => new Date(`${local.slice(0, 16)}:00Z`);
+  const weekday = (day: string) => weekdays.format(wallClock(`${day.slice(0, 10)}T00:00`));
+  const time = (local: string) => times.format(wallClock(local));
   const symbol = money.formatToParts(0).find((p) => p.type === 'currency')?.value ?? currency;
   const decimalSeparator = lang === 'de' ? ',' : '.';
 
@@ -77,6 +96,17 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
       const [y, m] = period.split('-').map(Number);
       if (!m) return narrow ? `’${String(y).slice(2)}` : String(y);
       return (narrow ? narrowMonths : months).format(new Date(Date.UTC(y, m - 1, 1)));
+    },
+    weekday,
+    time,
+    dateTime: (local) => `${dates.format(wallClock(local))}, ${time(local)}`,
+    span: (startsAt, endsAt) => {
+      const sameDay = startsAt.slice(0, 10) === endsAt.slice(0, 10);
+      // Ending at midnight belongs to the day before: "Mo 08:00–24:00"
+      const endsAtMidnight = endsAt.slice(11, 16) === '00:00' && addOneDay(startsAt) === endsAt.slice(0, 10);
+      if (sameDay) return `${weekday(startsAt)}, ${time(startsAt)}–${time(endsAt)}`;
+      if (endsAtMidnight) return `${weekday(startsAt)}, ${time(startsAt)}–24:00`;
+      return `${weekday(startsAt)}, ${time(startsAt)} – ${weekday(endsAt)}, ${time(endsAt)}`;
     },
     moneyInput: (cents) =>
       cents === null || cents === undefined ? '' : (cents / 100).toFixed(2).replace('.', decimalSeparator),

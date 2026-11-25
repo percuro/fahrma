@@ -13,6 +13,7 @@ from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
+from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
@@ -22,6 +23,7 @@ from app.services.audit_service import record
 from app.services.auth_service import AuthService, utcnow
 from app.services.limits import check_new_group, check_new_member
 from app.services.placeholders import delete_orphans, new_placeholder
+from app.services.reservation_service import delete_upcoming
 
 
 def groups_of(db: Session, user: User) -> list[dict]:
@@ -173,6 +175,9 @@ def update_member(
         membership.role = role
     if active is not None:
         membership.active = active
+        if not active:
+            # Whoever leaves no longer has the car booked; past reservations stay as history
+            delete_upcoming(ctx.db, user_id, utcnow(), ctx.group.id)
     ctx.db.flush()
     if count_admins(ctx.db, ctx.group.id) == 0:
         ctx.db.rollback()
@@ -241,6 +246,7 @@ def delete_group_data(db: Session, group_id: int) -> None:
     db.execute(delete(Trip).where(Trip.group_id == group_id))
     db.execute(delete(SettlementTransfer).where(SettlementTransfer.settlement_id.in_(settlement_ids)))
     db.execute(delete(Settlement).where(Settlement.group_id == group_id))
+    db.execute(delete(Reservation).where(Reservation.group_id == group_id))
     db.execute(delete(Car).where(Car.group_id == group_id))
     db.execute(delete(AuditEntry).where(AuditEntry.group_id == group_id))
     db.execute(delete(IdempotencyKey).where(IdempotencyKey.group_id == group_id))

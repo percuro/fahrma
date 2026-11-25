@@ -14,7 +14,7 @@ import { Loading } from './Status';
 import { OfflineBanner, OfflineSync } from './OfflineSync';
 import { clearCache } from '../lib/offline-cache';
 import { removeUserDrafts } from '../lib/outbox';
-import { HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
+import { CalendarIcon, HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
 
 export function AppLayout() {
   const me = useMe();
@@ -93,6 +93,7 @@ function SignedIn({ me }: { me: Me }) {
         {inGroup && (
           <nav className="bottomnav" aria-label={t.nav.areas}>
             <NavLink to={`/g/${gid}`} end><HomeIcon />{t.nav.overview}</NavLink>
+            <NavLink to={`/g/${gid}/calendar`}><CalendarIcon />{t.nav.calendar}</NavLink>
             <NavLink to={`/g/${gid}/history`}><ListIcon />{t.nav.history}</NavLink>
             <NavLink to={`/g/${gid}/settlement`}><ScaleIcon />{t.nav.settlement}</NavLink>
             <NavLink to={`/g/${gid}/group`}><UsersIcon />{t.nav.group}</NavLink>

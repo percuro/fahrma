@@ -12,6 +12,7 @@ from tests.support import PASSWORD, ApiTestEnvironment, accept
 
 TRIP = {"date": "2026-11-10", "start_km": 0, "end_km": 10, "shares": [{"user_id": 1, "weight": 1}], "external": []}
 FUEL = {"date": "2026-11-10", "amount_cents": 100, "paid_by_user_id": 1, "quantity_milli": 1000}
+RESERVATION = {"starts_at": "2026-12-01T10:00", "ends_at": "2026-12-01T12:00", "user_id": 1}
 EXPENSE = {"date": "2026-11-10", "category": "other", "amount_cents": 100, "paid_by_user_id": 1, "allocation": "equal"}
 
 # (method, path) -> (expected status for an outsider, request body)
@@ -54,6 +55,11 @@ ROUTES = {
     ("POST", "/v1/groups/{group_id}/settlements"): (404, {"period_end": "2026-11-20", "accept_warnings": True}),
     ("GET", "/v1/groups/{group_id}/settlements/{settlement_id}"): (404, None),
     ("DELETE", "/v1/groups/{group_id}/settlements/{settlement_id}"): (404, None),
+    ("GET", "/v1/groups/{group_id}/reservations"): (404, None),
+    ("POST", "/v1/groups/{group_id}/reservations"): (404, {**RESERVATION, "car_id": 1}),
+    ("GET", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, None),
+    ("PUT", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, {**RESERVATION, "car_id": 1}),
+    ("DELETE", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, None),
     ("DELETE", "/v1/account/sessions/{session_id}"): (404, None),
     # Admin routes act on other accounts by design: a normal account gets 403
     ("PATCH", "/v1/admin/users/{user_id}"): (403, {"is_active": False}),
@@ -82,6 +88,9 @@ OBJECT_ROUTES = {
     ("DELETE", "/v1/groups/{group_id}/settlements/{settlement_id}"),
     ("PATCH", "/v1/groups/{group_id}/members/{user_id}"),
     ("POST", "/v1/groups/{group_id}/members/{user_id}/invite"),
+    ("GET", "/v1/groups/{group_id}/reservations/{reservation_id}"),
+    ("PUT", "/v1/groups/{group_id}/reservations/{reservation_id}"),
+    ("DELETE", "/v1/groups/{group_id}/reservations/{reservation_id}"),
 }
 
 
@@ -118,6 +127,9 @@ class IsolationTest(unittest.TestCase):
                   "shares": [{"user_id": carl_id, "weight": 1}]},
         )  # fmt: skip
         settlement = self.bert.post(f"{base}/settlements", json={"period_end": "2026-11-20"}).json()
+        reservation = self.bert.post(
+            f"{base}/reservations", json={**RESERVATION, "car_id": car["id"], "user_id": bert_id}
+        ).json()
         self.bert_ids = {
             "group_id": gid,
             "user_id": carl_id,
@@ -127,6 +139,7 @@ class IsolationTest(unittest.TestCase):
             "expense_id": expense["id"],
             "transfer_id": settlement["transfers"][0]["id"],
             "settlement_id": settlement["id"],
+            "reservation_id": reservation["id"],
             "session_id": self.bert.get("/v1/account/sessions").json()[0]["id"],
             "invitation_id": self.anna.post("/v1/admin/invitations", json={}).json()["id"],
         }
@@ -165,7 +178,17 @@ class IsolationTest(unittest.TestCase):
             if not path.startswith("/v1/admin"):
                 outsider.request(method, path.format(**self.bert_ids), json=body)
         after = self.bert.get(f"/v1/groups/{self.bert_ids['group_id']}/export.json").json()
-        for key in ("group", "members", "cars", "trips", "fuel", "expenses", "settlements", "settlement_transfers"):
+        for key in (
+            "group",
+            "members",
+            "cars",
+            "trips",
+            "fuel",
+            "expenses",
+            "settlements",
+            "settlement_transfers",
+            "reservations",
+        ):
             self.assertEqual(after[key], self.before[key], key)
 
 

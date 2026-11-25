@@ -5,7 +5,8 @@ import { draftError, removeDraft, retryDraft, type Draft } from '../lib/outbox';
 import { useDrafts, useEntrySave } from '../hooks/useDrafts';
 import { parseKm } from '../lib/format';
 import { energyKind } from '../lib/cars';
-import type { Balance as BalanceData, Car, Trip } from '../lib/types';
+import type { Balance as BalanceData, Car, Group, Trip } from '../lib/types';
+import { nowIn } from '../lib/dates';
 import {
   isValidGroupId,
   useBalance,
@@ -14,6 +15,7 @@ import {
   useGroupId,
   useMemberNames,
   useOpenTransfers,
+  useReservations,
   useTrips,
 } from '../hooks/useGroupData';
 import { useSession } from '../hooks/useSession';
@@ -109,6 +111,8 @@ export function DashboardPage() {
         </section>
       )}
 
+      {activeCars.length > 0 && <Reservations group={groupData} cars={activeCars} />}
+
       <section>
         <h2>{d.recentTrips}</h2>
         {trips.isError ? (
@@ -127,6 +131,50 @@ export function DashboardPage() {
         </p>
       </section>
     </>
+  );
+}
+
+/** What is reserved now and next; a reservation that is over is not shown. */
+function Reservations({ group, cars }: { group: Group; cars: Car[] }) {
+  const t = useT();
+  const r = t.reservation;
+  const f = useFormat();
+  const gid = useGroupId();
+  const name = useMemberNames();
+  const reservations = useReservations();
+  const now = nowIn(group.effective_timezone);
+  const upcoming = (reservations.data ?? []).filter((x) => x.ends_at.slice(0, 16) > now).slice(0, 3);
+  const carName = (id: number) => cars.find((c) => c.id === id)?.name;
+  return (
+    <section>
+      <h2>{r.upcoming}</h2>
+      {reservations.isError ? (
+        <p className="subtle">{errorText(reservations.error)}</p>
+      ) : reservations.data ? (
+        <ul className="list card">
+          {upcoming.map((x) => (
+            <li key={x.id}>
+              <Link className="row" to={`/g/${gid}/reservation/${x.id}`}>
+                <span className="main">
+                  <span className="title">{name(x.user_id)}</span>
+                  <div className="meta">
+                    {[f.span(x.starts_at, x.ends_at), cars.length > 1 ? carName(x.car_id) : null].filter(Boolean).join(' · ')}
+                  </div>
+                </span>
+                {x.starts_at.slice(0, 16) <= now && <span className="badge accent">{r.now}</span>}
+              </Link>
+            </li>
+          ))}
+          {upcoming.length === 0 && <li className="row subtle">{r.noneUpcoming}</li>}
+        </ul>
+      ) : (
+        <Loading />
+      )}
+      <p className="link-row">
+        <Link to={`/g/${gid}/calendar`}>{r.toCalendar}</Link>
+        <Link to={`/g/${gid}/reservation/new`}>{r.reserve}</Link>
+      </p>
+    </section>
   );
 }
 

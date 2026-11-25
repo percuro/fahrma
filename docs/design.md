@@ -58,6 +58,14 @@ A new trip, a fuel receipt, an expense or finishing a running trip that cannot r
 
 A lost answer must not create a second entry: every draft carries a random key that goes with it as `Idempotency-Key`. The server remembers which entry a key created (per group and person), and a repeated request returns that entry instead of saving it again. If the server refuses a draft – it overlaps a trip someone else entered in the meantime, say – the draft stays with the reason, to be corrected or discarded. Logging out removes drafts and the kept data from the device, after a warning if something has not been sent.
 
+## Reservations
+
+Whoever needs the car on Saturday says so in the calendar; two reservations of the same car never overlap, the second one is refused with the name of whoever has it. A reservation is a promise between people, not a lock: a trip can always be recorded, and the trip form only says when the car is booked for someone else right now. Reserving needs a connection, because checking that the car is free is the whole point.
+
+Times are wall-clock times in the group's time zone, because that is how people agree on them ("Saturday, 9 to 12"). The server turns them into UTC with the time zone database, so daylight saving time is handled in one place: a time that does not exist when the clocks go forward is refused, a time that happens twice when they go back means the first one. The calendar shows a week at a time as a list of days, which works on a phone without a month grid.
+
+The person a reservation is for, whoever entered it and the group admins can change or cancel it until it is over. Leaving a group or deleting the account cancels upcoming reservations; past ones stay as part of the change log.
+
 ## Accessibility
 
 Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting.
