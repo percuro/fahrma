@@ -27,3 +27,15 @@ The start km of a new trip is prefilled with the car's last reading. Overlapping
 ## Settling
 
 Settling freezes all entries up to the end date. The end date can be neither in the future nor before the previous settlement. Only the latest settlement can be undone, by an admin of the group. All changes are recorded in the audit log.
+
+## Statistics
+
+The statistics page (overview → *Statistics*, or a car's tile) shows one car per year or over all years. It is only for looking at: the settlement never uses these numbers.
+
+| What | How |
+|---|---|
+| **Driven** | finished trips by their date; running trips do not count yet. |
+| **Consumption** | full to full: what was put in after one full tank (or full charge) up to and including the next one, divided by the km between their odometer readings. An interval only counts when every entry in it has a quantity and no entry without an odometer reading falls into its dates – it could belong to the interval or not. Intervals count in the year they end. Charging losses are included, the way you pay for them. |
+| **Cost per 100 km** | fuel or charging plus the car's other costs in the period, divided by its km. Costs without a car (e.g. a group's club fee) are not counted. |
+| **Price per litre or kWh** | all fuel or charging entries with a quantity: amount ÷ quantity. |
+| **Who drove how much** | km of shared trips are split by weight, rounded to whole km so they add up. |

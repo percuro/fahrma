@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.0 – 2026-11-26
+
+Working without a connection, and statistics per car.
+
+- **Offline drafts:** a trip, a fuel or charging receipt, an expense or finishing a running trip that cannot reach the server is saved on the device and sent automatically once there is a connection again (app start, back online, back in view, every 30 seconds). The overview lists what has not been sent yet; a new trip starts at the odometer reading of a drafted one.
+- **Starting without a connection:** the app opens offline with the last known group, members, cars and recent trips, so the forms work in an underground car park. Balances are never kept on the device; without a connection the overview says so.
+- **Refused drafts** (e.g. a trip that overlaps one someone else entered meantime) stay on the overview with the reason; open them to correct or discard.
+- **Statistics per car** (overview → *Statistics*, or a car's tile): km per month or year with chart and table, consumption full to full in l/100 km or kWh/100 km, cost per 100 km, average price per litre or kWh, costs by category and who drove how much. See [how it calculates](docs/calculation.md#statistics).
+- A banner shows when the device is offline. Logging out warns about drafts that have not been sent and removes drafts and the kept data from the device.
+
+### Security
+
+- New entries are sent with an `Idempotency-Key`: a request repeated after a lost answer returns the entry saved the first time (status 200, header `Idempotent-Replayed: true`) instead of a copy. Keys are per group and person; an entry deleted since is not created again (`409 already_sent`).
+- What the device keeps for offline use (`localStorage`) is limited to the account, the group with its members, the cars and the recent trips; it is removed when logging out or deleting the account, and when someone else logs in on the same device.
+
+### Upgrade notes
+
+- Migration `0005` runs automatically (table `idempotency_keys`). Nothing changes for existing data.
+- API: `POST /v1/groups/{id}/trips`, `/fuel`, `/expenses` and `/trips/{id}/finish` accept an optional `Idempotency-Key` header (8–64 characters `A–Z a–z 0–9 _ -`). New: `GET /v1/groups/{id}/cars/{car_id}/stats?year=`.
+- The new version of the app is offered as a reload as usual; drafts made with 0.5 do not exist, so there is nothing to migrate on the devices.
+
 ## 0.5.0 – 2026-11-25
 
 Moving groups between instances, people without an account, and optional e-mail.

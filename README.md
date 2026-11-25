@@ -4,13 +4,15 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.5 – moving groups between instances, people without an account, optional e-mail. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
+> Status: 0.6 – works without a connection, statistics per car. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
 - **Trips in seconds:** start km is prefilled with the car's last reading. Start a trip now and finish it later, or enter it afterwards. Share a trip equally or by weights (2:1), and record money from passengers outside the group.
 - **Fuel, charging and other costs:** fuel receipts with litres, charging with kWh, price per unit; insurance, tax, service, tyres, parking, toll and more, split by km, equally, to one person or like a specific trip.
 - **Fair rate per km** per car and period, calculated from the actual fuel costs. Fuel without driven km carries over to the next period.
+- **Works in the underground car park:** without a connection, entries are kept on the phone as drafts and sent automatically later – never twice. The app also starts offline.
+- **Statistics per car:** km per month, consumption full to full, cost per 100 km, price per litre or kWh, costs by category and who drove how much.
 - **Settlements** freeze a period, show at most n−1 transfers, and let the people involved tick them off. Only the latest settlement can be undone.
 - **Checks instead of surprises:** overlapping odometer readings are rejected, gaps are shown and must be confirmed, running trips block settling.
 - **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. People who do not want an account can be added by name; the others record for them, and a personal link lets them take over later. Audit log of every change, CSV and complete JSON export.
@@ -46,7 +48,6 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 ## Roadmap
 
-- **0.6** offline drafts (underground car parks), consumption and cost statistics per car
 - **0.7** reservation calendar, reminders via Web Push
 - **0.8** login via OpenID Connect
 - **0.9** receipt photos, beta hardening; **1.0** stable API and configuration

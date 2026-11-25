@@ -50,6 +50,14 @@ Invitation, password-reset and confirmation links carry their token after `#`. B
 
 Entering a trip happens in car parks with poor reception and long gaps between uses. A login that expired in the meantime does not throw the form away: the login appears on top of the page, and after logging in the entry can be saved as it is.
 
+## Working without a connection
+
+An underground car park is where trips end. The app starts there anyway: the service worker has the app itself, and the browser keeps what the forms need – the account, the group with its members, the cars and the recent trips. Balances and settlements are never kept on the device; amounts of money always come fresh from the server, and without a connection the overview says so instead of showing an old balance.
+
+A new trip, a fuel receipt, an expense or finishing a running trip that cannot reach the server becomes a draft on the device. Drafts are listed on the overview and sent in the order they were made as soon as the server answers again – when the app starts, comes back online or into view, and every 30 seconds. The next trip already starts at the odometer reading of a drafted one.
+
+A lost answer must not create a second entry: every draft carries a random key that goes with it as `Idempotency-Key`. The server remembers which entry a key created (per group and person), and a repeated request returns that entry instead of saving it again. If the server refuses a draft – it overlaps a trip someone else entered in the meantime, say – the draft stays with the reason, to be corrected or discarded. Logging out removes drafts and the kept data from the device, after a warning if something has not been sent.
+
 ## Accessibility
 
 Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting.
