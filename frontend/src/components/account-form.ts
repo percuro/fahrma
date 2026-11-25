@@ -12,9 +12,9 @@ export interface AccountForm {
   body: () => { username: string; display_name: string | null; password: string };
 }
 
-export function useAccountForm(): AccountForm {
+export function useAccountForm(initialDisplayName = ''): AccountForm {
   const t = useT();
-  const [values, setValues] = useState({ username: '', display_name: '', password: '', repeat: '' });
+  const [values, setValues] = useState({ username: '', display_name: initialDisplayName, password: '', repeat: '' });
   const [error, setError] = useState('');
   return {
     values,

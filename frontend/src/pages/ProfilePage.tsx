@@ -9,7 +9,7 @@ import { APP_NAME } from '../app/brand';
 import { useFeedback } from '../components/feedback-context';
 import { useT } from '../i18n';
 import { CreateGroup } from './StartPage';
-import { ChangePassword, DeleteAccount, Devices, MyData } from './AccountSections';
+import { ChangePassword, DeleteAccount, Devices, EmailAddress, MyData } from './AccountSections';
 import { LegalLinks } from '../components/LegalLinks';
 
 const LANGUAGE_NAMES = { de: 'Deutsch', en: 'English' } as const;
@@ -35,10 +35,12 @@ export function ProfilePage() {
       <details className="mt-1">
         <summary className="link-button">{t.start.createAnother}</summary>
         <CreateGroup />
+        <p><Link to="/import">{t.start.importGroup}</Link></p>
       </details>
       {me.role === 'admin' && (
         <p><Link className="button" to="/admin">{t.nav.admin}</Link></p>
       )}
+      <EmailAddress />
       <ChangePassword />
       <Devices />
       <MyData />

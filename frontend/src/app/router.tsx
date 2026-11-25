@@ -14,6 +14,8 @@ import { GroupPage } from '../pages/GroupPage';
 import { ProfilePage } from '../pages/ProfilePage';
 import { RegisterPage } from '../pages/RegisterPage';
 import { AdminPage } from '../pages/AdminPage';
+import { ImportPage } from '../pages/ImportPage';
+import { ForgotPasswordPage } from '../pages/ForgotPasswordPage';
 
 const legacy = ['fahrt/*', 'tanken/*', 'kosten/*', 'verlauf', 'abrechnung', 'abrechnung/*', 'gruppe'].map((path) => ({
   path: `g/:groupId/${path}`,
@@ -26,6 +28,7 @@ export const router = createBrowserRouter([
   { path: '/invite/:token', element: <LegacyInviteRedirect /> },
   { path: '/einladung/:token', element: <LegacyInviteRedirect /> },
   { path: '/register', element: <RegisterPage /> },
+  { path: '/forgot-password', element: <ForgotPasswordPage /> },
   {
     path: '/',
     element: <AppLayout />,
@@ -33,6 +36,7 @@ export const router = createBrowserRouter([
       { index: true, element: <StartPage /> },
       { path: 'profile', element: <ProfilePage /> },
       { path: 'admin', element: <AdminPage /> },
+      { path: 'import', element: <ImportPage /> },
       { path: 'g/:groupId', element: <DashboardPage /> },
       { path: 'g/:groupId/trip/new', element: <TripFormPage /> },
       { path: 'g/:groupId/trip/:tripId', element: <TripFormPage /> },

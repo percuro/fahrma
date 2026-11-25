@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
 import type { Group } from '../lib/types';
@@ -21,6 +21,7 @@ export function StartPage() {
       <h1>{t.start.welcome}</h1>
       <p>{t.start.intro}</p>
       <CreateGroup />
+      <p><Link to="/import">{t.start.importGroup}</Link></p>
     </>
   );
 }

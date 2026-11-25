@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 export interface Group {
@@ -78,4 +80,59 @@ export async function confirmDialog(page: Page, button: string | RegExp) {
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: button }).click();
   await expect(dialog).toBeHidden();
+}
+
+/**
+ * Mails of the instance, written as files when it runs with MAIL_DIR (see docs/development.md).
+ * E2E_MAIL_DIR is that directory as seen from the tests; without it, mail tests are skipped.
+ */
+export const MAIL_DIR = process.env.E2E_MAIL_DIR;
+
+export interface Mail {
+  to: string;
+  subject: string;
+  body: string;
+  link: string | null;
+}
+
+function decodeQuotedPrintable(text: string): string {
+  const bytes = text.replace(/=\r?\n/g, '').replace(/=([0-9A-F]{2})/g, (_, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+  return Buffer.from(bytes, 'latin1').toString('utf8');
+}
+
+/** Header values like "=?utf-8?q?f=C3=BCr?=" (RFC 2047). */
+function decodeHeader(value: string): string {
+  return value
+    .replace(/\?=\s+=\?/g, '?==?')
+    .replace(/=\?utf-8\?([qb])\?(.*?)\?=/gi, (_, kind: string, text: string) =>
+      kind.toLowerCase() === 'b'
+        ? Buffer.from(text, 'base64').toString('utf8')
+        : decodeQuotedPrintable(text.replace(/_/g, ' ')),
+    );
+}
+
+export function mailsTo(address: string): Mail[] {
+  if (!MAIL_DIR) return [];
+  return readdirSync(MAIL_DIR)
+    .filter((name) => name.endsWith('.eml'))
+    .sort()
+    .map((name) => {
+      const raw = readFileSync(join(MAIL_DIR, name), 'utf8');
+      const [folded, ...rest] = raw.split(/\r?\n\r?\n/);
+      const head = folded.replace(/\r?\n[ \t]+/g, ' ');
+      const header = (key: string) => decodeHeader(head.match(new RegExp(`^${key}: (.*)$`, 'mi'))?.[1].trim() ?? '');
+      const body = decodeQuotedPrintable(rest.join('\n\n'));
+      return { to: header('To'), subject: header('Subject'), body, link: body.match(/https?:\/\/\S+\/invite#[A-Za-z0-9_-]+/)?.[0] ?? null };
+    })
+    .filter((mail) => mail.to === address);
+}
+
+/** Waits for the next mail to an address (after `seen` earlier ones). */
+export async function nextMail(address: string, seen = 0): Promise<Mail> {
+  await expect.poll(() => mailsTo(address).length, { timeout: 10_000 }).toBeGreaterThan(seen);
+  return mailsTo(address)[seen];
+}
+
+export function uniqueEmail(): string {
+  return `${uniqueUsername()}@example.org`;
 }

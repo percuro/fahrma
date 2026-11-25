@@ -2,9 +2,8 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiFetch, apiUrl, errorText } from '../lib/api';
-import { APP_NAME } from '../app/brand';
 import { parseKm } from '../lib/format';
-import type { Car, EnergyUnit, Group } from '../lib/types';
+import type { Car, EnergyUnit, Group, GroupInviteCreated, Member } from '../lib/types';
 import { useAudit, useCars, useGroup, useGroupId, useGroupMutation, useMemberNames } from '../hooks/useGroupData';
 import { ME_KEY } from '../hooks/useMe';
 import { useSession } from '../hooks/useSession';
@@ -12,6 +11,8 @@ import { useFormat } from '../hooks/useFormat';
 import { useI18n, useT } from '../i18n';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
+import { LinkBox } from '../components/LinkBox';
+import { useMeta } from '../hooks/useMeta';
 
 const COMMON_CURRENCIES = ['EUR', 'CHF', 'GBP', 'USD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'];
 
@@ -38,9 +39,11 @@ export function GroupPage() {
 function Members() {
   const t = useT();
   const g = t.group;
+  const f = useFormat();
   const { confirm, toast } = useFeedback();
   const group = useGroup();
   const me = useSession();
+  const [open, setOpen] = useState<{ userId: number; mode: 'link' | 'rename' } | null>(null);
   const update = useGroupMutation<{ userId: number; role?: string; active?: boolean }>(
     'PATCH', ({ userId }) => `/members/${userId}`, ({ role, active }) => ({ role, active }),
   );
@@ -48,6 +51,15 @@ function Members() {
   const toggleActive = async (userId: number, name: string, active: boolean) => {
     if (active && !(await confirm(g.confirmRemove(name), { confirmLabel: g.removeMember, danger: true }))) return;
     update.mutate({ userId, active: !active }, { onSuccess: () => toast(t.common.saved) });
+  };
+  const describe = (m: Member) => {
+    if (m.deleted) return [g.deletedAccount];
+    return [
+      m.placeholder ? g.withoutAccount : `@${m.username}`,
+      m.role === 'admin' && g.admin,
+      !m.active && g.left,
+      m.link_expires_at && g.linkOpen(f.date(m.link_expires_at)),
+    ];
   };
   return (
     <section className="card">
@@ -57,67 +69,168 @@ function Members() {
           <li key={m.user_id} className="row wrap">
             <span className="main">
               <span className="title">{m.display_name}</span>
-              <div className="meta">
-                {(m.deleted ? [g.deletedAccount] : [`@${m.username}`, m.role === 'admin' && g.admin, !m.active && g.left])
-                  .filter(Boolean)
-                  .join(' · ')}
-              </div>
+              <div className="meta">{describe(m).filter(Boolean).join(' · ')}</div>
             </span>
             {isAdmin && m.user_id !== me.id && !m.deleted && (
               <span className="chips">
-                <button type="button" className="button small"
-                  onClick={() => update.mutate({ userId: m.user_id, role: m.role === 'admin' ? 'member' : 'admin' })}>
-                  {m.role === 'admin' ? g.revokeAdmin : g.makeAdmin}
-                </button>
+                {m.placeholder ? (
+                  <>
+                    {m.active && (
+                      <button type="button" className="button small" aria-expanded={open?.userId === m.user_id && open.mode === 'link'}
+                        onClick={() => setOpen({ userId: m.user_id, mode: 'link' })}>
+                        {g.personalLink}
+                      </button>
+                    )}
+                    <button type="button" className="button small" aria-expanded={open?.userId === m.user_id && open.mode === 'rename'}
+                      onClick={() => setOpen({ userId: m.user_id, mode: 'rename' })}>
+                      {g.renameMember}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className="button small"
+                    onClick={() => update.mutate({ userId: m.user_id, role: m.role === 'admin' ? 'member' : 'admin' })}>
+                    {m.role === 'admin' ? g.revokeAdmin : g.makeAdmin}
+                  </button>
+                )}
                 <button type="button" className="button small" onClick={() => toggleActive(m.user_id, m.display_name, m.active)}>
                   {m.active ? g.removeMember : g.readdMember}
                 </button>
               </span>
             )}
+            {open?.userId === m.user_id && (
+              <div className="panel">
+                {open.mode === 'link'
+                  ? <PersonalLink member={m} onClose={() => setOpen(null)} />
+                  : <RenameMember member={m} onDone={() => setOpen(null)} />}
+              </div>
+            )}
           </li>
         ))}
       </ul>
       {update.isError && <p className="error" role="alert">{errorText(update.error)}</p>}
+      {isAdmin && <AddPerson />}
     </section>
   );
 }
 
-function Invite() {
+/** Link with an optional e-mail address; used for group invitations and personal links. */
+function LinkCreator({ path, label, button, hint, onClose }: {
+  path: string;
+  label: string;
+  button: string;
+  hint?: string;
+  onClose?: () => void;
+}) {
   const t = useT();
   const g = t.group;
-  const f = useFormat();
-  const create = useGroupMutation<void, { url: string; expires_at: string }>('POST', () => '/invites');
-  const [copied, setCopied] = useState(false);
-  const url = create.data?.url;
-  const share = async () => {
-    if (!url) return;
-    try {
-      if (navigator.share) {
-        await navigator.share({ title: g.shareTitle(APP_NAME), url });
-        return;
-      }
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-    } catch {
-      // Sharing cancelled; the link is still there to copy
-    }
+  const meta = useMeta();
+  const [email, setEmail] = useState('');
+  const create = useGroupMutation<{ email: string | null }, GroupInviteCreated>('POST', () => path, (v) => v);
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    create.mutate({ email: email.trim() || null });
   };
+  const sentTo = create.data?.email_sent ? create.variables?.email : null;
+  return (
+    <div className="form">
+      {hint && <p className="subtle small m-0">{hint}</p>}
+      {create.data ? (
+        <LinkBox url={create.data.url} expiresAt={create.data.expires_at} sentTo={sentTo} label={label}
+          onNew={() => { create.reset(); setEmail(''); }} />
+      ) : (
+        <form className="form" onSubmit={submit}>
+          {meta.data?.mail && (
+            <label className="field">
+              <span>{g.sendTo}</span>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} autoComplete="off" />
+            </label>
+          )}
+          <div className="button-row mt-0">
+            <button type="submit" className="button primary" disabled={create.isPending}>{button}</button>
+            {onClose && <button type="button" className="button" onClick={onClose}>{t.common.cancel}</button>}
+          </div>
+        </form>
+      )}
+      {create.data && onClose && <button type="button" className="link-button" onClick={onClose}>{g.close}</button>}
+      {create.isError && <p className="error" role="alert">{errorText(create.error)}</p>}
+    </div>
+  );
+}
+
+function PersonalLink({ member, onClose }: { member: Member; onClose: () => void }) {
+  const g = useT().group;
+  return (
+    <LinkCreator path={`/members/${member.user_id}/invite`} label={g.personalLink} button={g.createInvite}
+      hint={g.personalLinkHint(member.display_name)} onClose={onClose} />
+  );
+}
+
+function RenameMember({ member, onDone }: { member: Member; onDone: () => void }) {
+  const t = useT();
+  const { toast } = useFeedback();
+  const [name, setName] = useState(member.display_name);
+  const rename = useGroupMutation<string>('PATCH', () => `/members/${member.user_id}`, (display_name) => ({ display_name }));
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    rename.mutate(name.trim(), {
+      onSuccess: () => {
+        toast(t.common.saved);
+        onDone();
+      },
+    });
+  };
+  return (
+    <form className="form" onSubmit={submit}>
+      <label className="field">
+        <span>{t.common.name}</span>
+        <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} autoFocus />
+      </label>
+      {rename.isError && <p className="error" role="alert">{errorText(rename.error)}</p>}
+      <div className="button-row mt-0">
+        <button type="submit" className="button primary" disabled={rename.isPending || !name.trim()}>{t.common.save}</button>
+        <button type="button" className="button" onClick={onDone}>{t.common.cancel}</button>
+      </div>
+    </form>
+  );
+}
+
+function AddPerson() {
+  const t = useT();
+  const g = t.group;
+  const { toast } = useFeedback();
+  const [name, setName] = useState('');
+  const add = useGroupMutation<string>('POST', () => '/members', (display_name) => ({ display_name }));
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    add.mutate(name.trim(), {
+      onSuccess: () => {
+        setName('');
+        toast(t.common.saved);
+      },
+    });
+  };
+  return (
+    <details className="mt-1">
+      <summary className="link-button">{g.addPerson}</summary>
+      <form className="form mt-1" onSubmit={submit}>
+        <p className="subtle small m-0">{g.addPersonHint}</p>
+        <label className="field">
+          <span>{t.common.name}</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} required maxLength={80} />
+        </label>
+        {add.isError && <p className="error" role="alert">{errorText(add.error)}</p>}
+        <button type="submit" className="button" disabled={add.isPending || !name.trim()}>{g.add}</button>
+      </form>
+    </details>
+  );
+}
+
+function Invite() {
+  const g = useT().group;
   return (
     <section className="card">
       <h2 className="mt-0">{g.invite}</h2>
-      <p className="subtle small mt-0">{g.inviteHint}</p>
-      {!url && <button type="button" className="button primary" onClick={() => create.mutate()} disabled={create.isPending}>{g.createInvite}</button>}
-      {url && (
-        <div className="form">
-          <input readOnly value={url} onFocus={(e) => e.target.select()} aria-label={g.inviteLink} />
-          <div className="button-row mt-0">
-            <button type="button" className="button primary" onClick={share}>{copied ? g.copied : g.share}</button>
-            <button type="button" className="button" onClick={() => { create.reset(); setCopied(false); }}>{g.newLink}</button>
-          </div>
-          <p className="subtle small m-0">{g.validUntil(f.date(create.data?.expires_at))}</p>
-        </div>
-      )}
-      {create.isError && <p className="error" role="alert">{errorText(create.error)}</p>}
+      <LinkCreator path="/invites" label={g.inviteLink} button={g.createInvite} hint={g.inviteHint} />
     </section>
   );
 }
