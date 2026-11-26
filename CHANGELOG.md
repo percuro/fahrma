@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.9.1-rc.1 – 2026-11-26
+## 0.9.1 – 2026-11-26
 
 - Fixed: on iPhone and iPad, date and time fields stuck out of narrow forms on the right and showed their value centred. They now have the width of the other fields and start on the left; tapping still opens the picker.
 - No migration, no new settings.
