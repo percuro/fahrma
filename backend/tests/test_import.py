@@ -88,7 +88,8 @@ class ImportTests(RichGroupMixin, unittest.TestCase):
         preview = response.json()
         self.assertEqual((preview["name"], preview["currency"]), ("Test group", "EUR"))
         self.assertEqual(
-            preview["counts"], {"cars": 1, "trips": 4, "fuel": 3, "expenses": 3, "settlements": 1, "reservations": 0}
+            preview["counts"],
+            {"cars": 1, "trips": 4, "fuel": 3, "expenses": 3, "settlements": 1, "reservations": 0, "receipts": 0},
         )
         self.assertEqual((preview["first_date"], preview["last_date"]), ("2026-11-10", "2026-11-22"))
         members = {m["user_id"]: (m["display_name"], m["role"], m["active"], m["deleted"]) for m in preview["members"]}

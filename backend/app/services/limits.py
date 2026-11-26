@@ -1,7 +1,7 @@
-"""Limits for hosted instances. MAX_GROUPS_PER_USER applies per account; members and cars per
-group come from the group's plan (see app.services.plans), which without PLANS_FILE simply
-carries MAX_MEMBERS_PER_GROUP and MAX_CARS_PER_GROUP. Unset or 0 = unlimited, the default
-for self-hosting.
+"""Limits for hosted instances. MAX_GROUPS_PER_USER applies per account; members, cars and
+receipt storage per group come from the group's plan (see app.services.plans), which without
+PLANS_FILE simply carries MAX_MEMBERS_PER_GROUP, MAX_CARS_PER_GROUP and MAX_RECEIPT_MB_PER_GROUP.
+Unset or 0 = unlimited, the default for self-hosting.
 
 Limits are only checked when something is added: a group above the limits of its plan (after
 a plan ran out, or after a move) keeps everything and can work as before."""
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.config import Plan, get_limit, get_plans
 from app.errors import AppError
 from app.models.group import Membership
-from app.services.plans import effective_plan, get_group, usage
+from app.services.plans import MEGABYTE, effective_plan, get_group, receipt_bytes, usage
 
 
 def limits() -> dict[str, int | None]:
@@ -23,6 +23,7 @@ def limits() -> dict[str, int | None]:
         "groups_per_user": get_limit("MAX_GROUPS_PER_USER"),
         "members_per_group": default.members_per_group,
         "cars_per_group": default.cars_per_group,
+        "receipt_mb_per_group": default.receipt_mb_per_group,
     }
 
 
@@ -65,3 +66,11 @@ def check_new_member(db: Session, group_id: int) -> None:
 def check_new_car(db: Session, group_id: int) -> None:
     """Archived cars do not count: archive an old car to make room."""
     _check_group(db, group_id, "cars_per_group")
+
+
+def check_receipt_space(db: Session, group_id: int, new_bytes: int) -> None:
+    """Room for one more photo of ``new_bytes``; deleting photos makes room again."""
+    plan = effective_plan(get_group(db, group_id))
+    maximum = plan.receipt_mb_per_group
+    if maximum is not None and receipt_bytes(db, group_id) + new_bytes > maximum * MEGABYTE:
+        _raise("receipt_mb_per_group", maximum, plan)

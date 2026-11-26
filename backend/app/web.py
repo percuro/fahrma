@@ -20,7 +20,7 @@ from app import config
 from app.db.database import SessionLocal
 from app.main import app as api
 from app.middleware.security_headers import add_security_headers
-from app.services import inactive_accounts, notification_service, setup_service
+from app.services import inactive_accounts, notification_service, receipt_store, setup_service
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -74,8 +74,9 @@ async def lifespan(_app: FastAPI):
     announce_setup_token()
     reminders = asyncio.create_task(remind()) if config.push_enabled() else None
     cleanup = asyncio.create_task(delete_inactive()) if config.get_inactive_delete_months() else None
+    sweep = asyncio.create_task(sweep_receipts()) if config.receipts_enabled() else None
     yield
-    for task in (reminders, cleanup):
+    for task in (reminders, cleanup, sweep):
         if task is not None:
             task.cancel()
 
@@ -112,6 +113,24 @@ async def delete_inactive() -> None:
         except Exception:
             logger.exception("Deleting inactive accounts failed")
         await asyncio.sleep(INACTIVE_INTERVAL_SECONDS)
+
+
+# Receipt photos: remove files left without a database row (a crash between writing and
+# committing, or a deletion interrupted after its commit), once an hour
+RECEIPT_SWEEP_FIRST_DELAY_SECONDS = 10 * 60
+RECEIPT_SWEEP_INTERVAL_SECONDS = 60 * 60
+
+
+async def sweep_receipts() -> None:
+    await asyncio.sleep(RECEIPT_SWEEP_FIRST_DELAY_SECONDS)
+    while True:
+        try:
+            await asyncio.to_thread(receipt_store.run_sweep, SessionLocal)
+        except OperationalError:
+            logger.warning("Receipt cleanup skipped: database not ready")
+        except Exception:
+            logger.exception("Receipt cleanup failed")
+        await asyncio.sleep(RECEIPT_SWEEP_INTERVAL_SECONDS)
 
 
 def announce_setup_token() -> None:

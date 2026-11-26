@@ -7,6 +7,7 @@
  * second copy.
  */
 import { ApiError, apiRequest, isNetworkError } from './api';
+import { assignDraftPhotos } from './photo-outbox';
 import type { ExpenseWrite, FuelWrite, TripWrite } from './types';
 
 export type DraftKind = 'trip' | 'fuel' | 'expense' | 'finish';
@@ -187,7 +188,12 @@ export function syncDrafts(userId: number): Promise<SyncResult> {
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
     for (const draft of waiting) {
       try {
-        await sendEntry(draft.groupId, draft.kind, draft.entityId, draft.body, draft.id);
+        const saved = await sendEntry(draft.groupId, draft.kind, draft.entityId, draft.body, draft.id);
+        // Photos waiting for this draft go with the saved entry
+        const entryId = draft.entityId ?? (saved as { id?: number } | undefined)?.id;
+        if (entryId !== undefined && (draft.kind === 'fuel' || draft.kind === 'expense')) {
+          await assignDraftPhotos(draft.id, entryId);
+        }
         removeDraft(draft.id);
         result.sent.push(draft);
       } catch (error) {

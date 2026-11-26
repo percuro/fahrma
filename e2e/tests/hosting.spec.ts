@@ -3,7 +3,7 @@ import { createGroupWithCar, today } from './helpers';
 
 /**
  * Plans per group. Needs an instance with PLANS_FILE (plans "open" as default, without limits,
- * and "small" with one car) and BILLING_URL; otherwise skipped. See .github/workflows/ci.yml.
+ * and "small" with one car and 1 MB for receipts) and BILLING_URL; otherwise skipped. See .github/workflows/ci.yml.
  */
 test.beforeEach(async ({ request }) => {
   const meta = (await (await request.get('/api/v1/meta')).json()) as { plans: { id: string }[] | null; billing: boolean };
@@ -25,6 +25,7 @@ test('a group on a small plan: what it shows, what it refuses, where admins chan
   await expect(card).toContainText(/gültig bis/);
   await expect(card.getByRole('listitem').filter({ hasText: 'Autos' })).toContainText('1 von 1 · voll');
   await expect(card.getByRole('listitem').filter({ hasText: 'Mitglieder' })).toContainText('1 von 3');
+  await expect(card.getByRole('listitem').filter({ hasText: 'Speicher für Belege' })).toContainText('0 MB von 1 MB');
   // The operator's note stays in the administration
   await expect(page.getByText('E2E invoice')).toHaveCount(0);
 

@@ -162,7 +162,7 @@ def get_operator_links() -> dict[str, str | None]:
     }
 
 
-LIMIT_NAMES = ("MAX_GROUPS_PER_USER", "MAX_MEMBERS_PER_GROUP", "MAX_CARS_PER_GROUP")
+LIMIT_NAMES = ("MAX_GROUPS_PER_USER", "MAX_MEMBERS_PER_GROUP", "MAX_CARS_PER_GROUP", "MAX_RECEIPT_MB_PER_GROUP")
 
 
 def get_limit(name: str) -> int | None:
@@ -180,7 +180,12 @@ def get_limit(name: str) -> int | None:
 
 
 # Limits that belong to a group and therefore to its plan; MAX_GROUPS_PER_USER stays per instance
-GROUP_LIMITS = {"members_per_group": "MAX_MEMBERS_PER_GROUP", "cars_per_group": "MAX_CARS_PER_GROUP"}
+GROUP_LIMITS = {
+    "members_per_group": "MAX_MEMBERS_PER_GROUP",
+    "cars_per_group": "MAX_CARS_PER_GROUP",
+    # Megabytes of receipt photos
+    "receipt_mb_per_group": "MAX_RECEIPT_MB_PER_GROUP",
+}
 DEFAULT_PLAN_ID = "default"
 _PLAN_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
 _LOCALE = re.compile(r"^[a-z]{2}$")
@@ -194,6 +199,7 @@ class Plan:
     # None = unlimited
     members_per_group: int | None
     cars_per_group: int | None
+    receipt_mb_per_group: int | None = None
 
     def limit(self, name: str) -> int | None:
         return getattr(self, name)
@@ -267,6 +273,7 @@ def _parse_plans(text: str) -> PlanSettings:
             name=_plan_name(raw, where),
             members_per_group=_plan_limit(raw, "members_per_group", where),
             cars_per_group=_plan_limit(raw, "cars_per_group", where),
+            receipt_mb_per_group=_plan_limit(raw, "receipt_mb_per_group", where),
         )
     default = data.get("default")
     if default not in plans:
@@ -304,6 +311,7 @@ def get_plans(strict: bool = False) -> PlanSettings:
                     name=DEFAULT_PLAN_ID,
                     members_per_group=get_limit("MAX_MEMBERS_PER_GROUP"),
                     cars_per_group=get_limit("MAX_CARS_PER_GROUP"),
+                    receipt_mb_per_group=get_limit("MAX_RECEIPT_MB_PER_GROUP"),
                 )
             },
             default=DEFAULT_PLAN_ID,
@@ -351,6 +359,41 @@ def get_operator_token() -> str | None:
     if token is not None and len(token) < 32:
         raise ConfigError("OPERATOR_TOKEN must be at least 32 characters long, e.g. from `openssl rand -hex 32`")
     return token
+
+
+def receipts_enabled() -> bool:
+    """Receipt photos are on by default; RECEIPTS=off turns them off (no files are stored)."""
+    return env_bool("RECEIPTS", True)
+
+
+def get_receipts_dir() -> Path:
+    """Where receipt photos are stored: RECEIPTS_DIR, or "receipts" next to the SQLite file."""
+    value = os.getenv("RECEIPTS_DIR", "").strip()
+    if value:
+        return Path(value)
+    url = get_database_url()
+    prefix = "sqlite:///"
+    path = url[len(prefix) :] if url.startswith(prefix) else ""
+    if not path or path == ":memory:" or path.startswith("file:"):
+        raise ConfigError("Set RECEIPTS_DIR (receipt photos), or RECEIPTS=off")
+    return Path(path).resolve().parent / "receipts"
+
+
+DEFAULT_MAX_RECEIPT_BYTES = 3 * 1024 * 1024
+
+
+def get_max_receipt_bytes() -> int:
+    """Largest receipt photo accepted; the app shrinks photos to a few hundred KB before sending."""
+    value = os.getenv("MAX_RECEIPT_KB", "").strip()
+    if not value:
+        return DEFAULT_MAX_RECEIPT_BYTES
+    try:
+        kilobytes = int(value)
+    except ValueError as exc:
+        raise ConfigError(f"MAX_RECEIPT_KB must be a whole number (got {value!r})") from exc
+    if kilobytes < 100:
+        raise ConfigError(f"MAX_RECEIPT_KB must be at least 100 (got {value!r})")
+    return kilobytes * 1024
 
 
 MIN_INACTIVE_DELETE_MONTHS = 3
@@ -488,5 +531,8 @@ def validate() -> None:
     get_billing_url()
     get_operator_token()
     get_inactive_delete_months()
+    if receipts_enabled():
+        get_receipts_dir()
+        get_max_receipt_bytes()
     get_mail_settings()
     get_push_settings()

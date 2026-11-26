@@ -11,7 +11,7 @@ Running fahrma for your family is one thing; running it for people you do not kn
 ## Operator information
 
 - [ ] Publish an imprint, a privacy policy and terms of use on your own website and set `IMPRINT_URL`, `PRIVACY_URL` and `TERMS_URL`. They appear on the login, registration, invitation and profile pages. With open registration and `TERMS_URL`, new accounts must tick that they accept the terms.
-- [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language, e-mail address if given), people without an account whom a group added (their name only), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log), and your reverse proxy's and backups' own logs and retention.
+- [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language, e-mail address if given), people without an account whom a group added (their name only), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log, receipt photos – shrunk and without location data), and your reverse proxy's and backups' own logs and retention.
 - [ ] Set `INACTIVE_DELETE_MONTHS` (24, say) so that unused accounts do not stay forever, and name the period in your privacy policy. People are warned by mail 30 days before; check first with `python -m app.cli.inactive --months 24` ([details](configuration.md#deleting-unused-accounts)).
 - [ ] People can download their data (profile → *My data*, JSON) and delete their account themselves. Deleting keeps their bookings in shared groups under an anonymous name, so the other members' balances stay correct – mention that in the privacy policy.
 
@@ -19,8 +19,8 @@ Running fahrma for your family is one thing; running it for people you do not kn
 
 One instance carries many groups; you do not need an instance per customer. The group is the unit that has a plan.
 
-- [ ] Simple caps for everyone: `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP`. Reaching a limit shows a clear message; archiving a car frees its place.
-- [ ] Different limits per group – a free plan and a paid one: describe them in `PLANS_FILE` ([plans](configuration.md#plans)) and keep `MAX_GROUPS_PER_USER` as a cap per account. Members see their group's plan and what counts against it on the group page.
+- [ ] Simple caps for everyone: `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP`, `MAX_CARS_PER_GROUP` and `MAX_RECEIPT_MB_PER_GROUP`. Reaching a limit shows a clear message; archiving a car frees its place.
+- [ ] Different limits per group – a free plan and a paid one: describe them in `PLANS_FILE` ([plans](configuration.md#plans)), storage for [receipt photos](configuration.md#receipt-photos) included, and keep `MAX_GROUPS_PER_USER` as a cap per account. Members see their group's plan and what counts against it on the group page.
 - [ ] Decide how a group gets a bigger plan. By hand: set `BILLING_URL` to your pricing or contact page (it receives the group number), invoice outside the app, and set the plan with an end date under profile → *Instance administration* → *Groups*; the note field is for your invoice number. Automated: a billing service of your own behind `BILLING_URL` that checks the signed link and sets the plan through the [operator API](operator-api.md).
 - [ ] Plans never lock anyone out: when a plan ends or gets smaller, groups keep everything and only cannot add beyond the new limits. Say so in your terms.
 - [ ] Mention in your privacy policy what billing involves: the group number, the admin's name and confirmed e-mail address go to your billing service when someone changes the plan.
@@ -28,12 +28,12 @@ One instance carries many groups; you do not need an instance per customer. The 
 
 ## Moving groups
 
-- [ ] People can bring a group from another instance (Group → Data → *Complete as JSON* there, *Move a group here from another instance* here). The importing person becomes admin; everyone else becomes a person without an account until they use a personal link. Imports count against your limits and are capped at 20 MB.
+- [ ] People can bring a group from another instance (Group → Data → *Complete as JSON* there, *Move a group here from another instance* here). The importing person becomes admin; everyone else becomes a person without an account until they use a personal link. Imports count against your limits and are capped at 20 MB. Receipt photos do not move along; people download them as a ZIP first.
 
 ## Operations
 
 - [ ] TLS reverse proxy in front, the container port only reachable from the proxy, `PUBLIC_URL` with `https://`.
-- [ ] Nightly backups with `app.cli.dump_sql`, kept off the server and encrypted, with a retention period that matches your privacy policy; test a restore regularly ([self-hosting.md](self-hosting.md#backup-and-restore)).
+- [ ] Nightly backups with `app.cli.dump_sql` **and of the `receipts` directory**, kept off the server and encrypted, with a retention period that matches your privacy policy; test a restore regularly ([self-hosting.md](self-hosting.md#backup-and-restore)).
 - [ ] Monitor `GET /api/health` and the backup job.
 - [ ] With `OPERATOR_TOKEN`: keep it in a file (`OPERATOR_TOKEN_FILE`, e.g. a Docker secret), only in your billing service, and rotate it if it leaks (open billing links stop working then, which is harmless).
 - [ ] Watch for new releases and read the [changelog](../CHANGELOG.md) before updating; pin image versions for deliberate updates.

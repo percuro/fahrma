@@ -96,6 +96,7 @@ def preview(data: GroupExportFile) -> ImportPreview:
             expenses=len(data.expenses),
             settlements=len(data.settlements),
             reservations=len(data.reservations),
+            receipts=len(data.receipts),
         ),
         first_date=min(dates) if dates else None,
         last_date=max(dates) if dates else None,

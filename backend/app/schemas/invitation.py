@@ -100,6 +100,7 @@ class Limits(BaseModel):
     groups_per_user: int | None
     members_per_group: int | None
     cars_per_group: int | None
+    receipt_mb_per_group: int | None = None
 
 
 class MetaRead(BaseModel):
@@ -120,3 +121,5 @@ class MetaRead(BaseModel):
     billing: bool = False
     # Accounts unused for this many months are deleted (after a warning); None = never
     inactive_delete_months: int | None = None
+    # Receipt photos can be attached to fuel entries and expenses (RECEIPTS, on by default)
+    receipts: bool = True

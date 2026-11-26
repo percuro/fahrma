@@ -122,7 +122,7 @@ Invitation links from 0.1 (`/einladung/…`) keep working.
 
 ## Backup and restore
 
-All data is one SQLite file on the `data` volume. Create a consistent plain-SQL dump while the app is running:
+All data is on the `data` volume: one SQLite file, and the receipt photos in `receipts/` next to it. Create a consistent plain-SQL dump of the database while the app is running:
 
 ```bash
 docker compose exec -T app python -m app.cli.dump_sql > fahrma.sql
@@ -133,6 +133,14 @@ The dump is uncompressed on purpose so that deduplicating backup tools such as r
 ```cron
 30 3 * * * cd /srv/fahrma && restic backup --stdin-filename fahrma.sql --stdin-from-command -- docker compose exec -T app python -m app.cli.dump_sql
 ```
+
+The dump does not contain the photos. Back up the `receipts` directory as well – the files never change once written, so an incremental backup stays small. With restic, for the compose project in `/srv/fahrma` (volume `fahrma_data`; `docker volume inspect fahrma_data` shows where it lives):
+
+```cron
+45 3 * * * restic backup /var/lib/docker/volumes/fahrma_data/_data/receipts
+```
+
+Restoring the photos means copying that directory back into the volume (owned by the container user, uid 10001). Photos whose entry is not in the restored database are removed after an hour; entries whose photo is missing show no picture.
 
 Restore into an empty data volume (the command refuses to overwrite an existing database):
 

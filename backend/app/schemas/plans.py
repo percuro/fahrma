@@ -12,11 +12,15 @@ class PlanInfo(BaseModel):
     # None = unlimited
     members_per_group: int | None
     cars_per_group: int | None
+    # Megabytes of receipt photos
+    receipt_mb_per_group: int | None = None
 
 
 class PlanUsage(BaseModel):
     members_per_group: int
     cars_per_group: int
+    # Megabytes, one decimal
+    receipt_mb_per_group: float = 0
 
 
 class GroupPlanRead(PlanInfo):

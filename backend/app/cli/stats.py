@@ -15,6 +15,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Group, Membership
+from app.models.receipt import Receipt
 from app.models.trip import Trip
 from app.models.user import User
 from app.services.auth_service import utcnow
@@ -58,6 +59,8 @@ def collect(db: Session) -> dict:
         "trips": _count(db, select(func.count()).select_from(Trip)),
         "fuel_entries": _count(db, select(func.count()).select_from(FuelEntry)),
         "expenses": _count(db, select(func.count()).select_from(Expense)),
+        "receipts": _count(db, select(func.count()).select_from(Receipt)),
+        "receipt_mb": round(_count(db, select(func.sum(Receipt.bytes))) / (1024 * 1024), 1),
         "entries_per_month": dict(sorted(months.items())),
         # Plan in force per group (one implicit plan "default" without PLANS_FILE)
         "groups_per_plan": dict(sorted(plans.items())),

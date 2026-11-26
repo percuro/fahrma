@@ -14,6 +14,7 @@ import { Loading } from './Status';
 import { OfflineBanner, OfflineSync } from './OfflineSync';
 import { clearCache } from '../lib/offline-cache';
 import { removeUserDrafts } from '../lib/outbox';
+import { discardUserPhotos } from '../lib/photo-outbox';
 import { unsubscribeLocally } from '../lib/push';
 import { CalendarIcon, HomeIcon, ListIcon, ScaleIcon, UserIcon, UsersIcon } from './Icons';
 import { BrandMark } from './BrandMark';
@@ -35,7 +36,10 @@ export function AppLayout() {
     // Logged out or account deleted: nothing of this person stays on the device
     const onLogout = () => {
       setLastMe(null);
-      if (lastUserId.current !== null) removeUserDrafts(lastUserId.current);
+      if (lastUserId.current !== null) {
+        removeUserDrafts(lastUserId.current);
+        void discardUserPhotos(lastUserId.current);
+      }
       clearCache();
       // The server ended this device's subscription with the login
       void unsubscribeLocally();

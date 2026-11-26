@@ -16,6 +16,7 @@ from app.models.car import Car
 from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Membership
+from app.models.receipt import Receipt
 from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
@@ -28,6 +29,8 @@ from app.services.rows import row_dict
 # The plan belongs to the instance, not to the group's data: it does not move along, and
 # the operator's note is never shown to the group
 INSTANCE_ONLY_COLUMNS = frozenset({"plan", "plan_until", "plan_note"})
+# Where a photo lies on this instance's disk
+RECEIPT_FILE_COLUMNS = frozenset({"file"})
 
 
 def export_group(ctx: GroupContext) -> dict:
@@ -86,5 +89,10 @@ def export_group(ctx: GroupContext) -> dict:
             .order_by(SettlementTransfer.id)
         ),
         "reservations": rows(select(Reservation).where(Reservation.group_id == group_id).order_by(Reservation.id)),
+        # Only what is known about the photos; the images are in the receipts ZIP and do not move along
+        "receipts": [
+            row_dict(receipt, exclude=RECEIPT_FILE_COLUMNS)
+            for receipt in db.scalars(select(Receipt).where(Receipt.group_id == group_id).order_by(Receipt.id))
+        ],
         "audit_log": audit,
     }

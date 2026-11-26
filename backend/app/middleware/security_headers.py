@@ -6,7 +6,7 @@ from app.config import get_public_url
 
 CONTENT_SECURITY_POLICY = (
     "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data:; connect-src 'self'; font-src 'self'; manifest-src 'self'; "
+    "img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; manifest-src 'self'; "
     "worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; "
     "frame-ancestors 'none'"
 )

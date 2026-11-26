@@ -8,7 +8,7 @@ slip through untested. Foreign IDs give 404 (not 403), so IDs cannot be probed.
 import unittest
 
 from app.main import app
-from tests.support import PASSWORD, ApiTestEnvironment, accept
+from tests.support import JPEG_HEADERS, PASSWORD, ApiTestEnvironment, accept, jpeg
 
 TRIP = {"date": "2026-11-10", "start_km": 0, "end_km": 10, "shares": [{"user_id": 1, "weight": 1}], "external": []}
 FUEL = {"date": "2026-11-10", "amount_cents": 100, "paid_by_user_id": 1, "quantity_milli": 1000}
@@ -61,6 +61,11 @@ ROUTES = {
     ("PUT", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, {**RESERVATION, "car_id": 1}),
     ("DELETE", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, None),
     ("POST", "/v1/groups/{group_id}/billing-link"): (404, None),
+    ("POST", "/v1/groups/{group_id}/fuel/{fuel_id}/receipts"): (404, None),
+    ("POST", "/v1/groups/{group_id}/expenses/{expense_id}/receipts"): (404, None),
+    ("GET", "/v1/groups/{group_id}/receipts.zip"): (404, None),
+    ("GET", "/v1/groups/{group_id}/receipts/{receipt_id}"): (404, None),
+    ("DELETE", "/v1/groups/{group_id}/receipts/{receipt_id}"): (404, None),
     ("DELETE", "/v1/account/sessions/{session_id}"): (404, None),
     # Admin routes act on other accounts by design: a normal account gets 403
     ("PATCH", "/v1/admin/users/{user_id}"): (403, {"is_active": False}),
@@ -96,6 +101,10 @@ OBJECT_ROUTES = {
     ("GET", "/v1/groups/{group_id}/reservations/{reservation_id}"),
     ("PUT", "/v1/groups/{group_id}/reservations/{reservation_id}"),
     ("DELETE", "/v1/groups/{group_id}/reservations/{reservation_id}"),
+    ("POST", "/v1/groups/{group_id}/fuel/{fuel_id}/receipts"),
+    ("POST", "/v1/groups/{group_id}/expenses/{expense_id}/receipts"),
+    ("GET", "/v1/groups/{group_id}/receipts/{receipt_id}"),
+    ("DELETE", "/v1/groups/{group_id}/receipts/{receipt_id}"),
 }
 
 
@@ -135,6 +144,8 @@ class IsolationTest(unittest.TestCase):
         reservation = self.bert.post(
             f"{base}/reservations", json={**RESERVATION, "car_id": car["id"], "user_id": bert_id}
         ).json()
+        receipt = self.bert.post(f"{base}/fuel/{fuel['id']}/receipts", content=jpeg(), headers=JPEG_HEADERS)
+        assert receipt.status_code == 201, receipt.text
         self.bert_ids = {
             "group_id": gid,
             "user_id": carl_id,
@@ -145,6 +156,7 @@ class IsolationTest(unittest.TestCase):
             "transfer_id": settlement["transfers"][0]["id"],
             "settlement_id": settlement["id"],
             "reservation_id": reservation["id"],
+            "receipt_id": receipt.json()["id"],
             "session_id": self.bert.get("/v1/account/sessions").json()[0]["id"],
             "invitation_id": self.anna.post("/v1/admin/invitations", json={}).json()["id"],
         }
@@ -193,6 +205,7 @@ class IsolationTest(unittest.TestCase):
             "settlements",
             "settlement_transfers",
             "reservations",
+            "receipts",
         ):
             self.assertEqual(after[key], self.before[key], key)
 

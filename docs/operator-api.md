@@ -22,12 +22,12 @@ Errors have the same shape as everywhere else: `{"detail": {"code": "…", "mess
   "plan_until": "2027-11-30",
   "plan_note": "Invoice 2026-017",
   "effective_plan": "plus",
-  "usage": { "members_per_group": 4, "cars_per_group": 2 },
+  "usage": { "members_per_group": 4, "cars_per_group": 2, "receipt_mb_per_group": 12.5 },
   "admins": [{ "user_id": 3, "display_name": "Anna" }]
 }
 ```
 
-`plan` is what is stored for the group (`null` = the default plan); `effective_plan` is the plan in force today, which differs once `plan_until` has passed or the plan was removed from `PLANS_FILE`. Times are UTC, `plan_until` is a day in the group's time zone (the last day the plan is valid).
+`usage.receipt_mb_per_group` is the storage the group's receipt photos take, in megabytes with one decimal. `plan` is what is stored for the group (`null` = the default plan); `effective_plan` is the plan in force today, which differs once `plan_until` has passed or the plan was removed from `PLANS_FILE`. Times are UTC, `plan_until` is a day in the group's time zone (the last day the plan is valid).
 
 ## Setting a plan
 

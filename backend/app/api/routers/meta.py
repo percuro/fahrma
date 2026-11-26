@@ -9,6 +9,7 @@ from app.config import (
     get_plans,
     get_registration_mode,
     mail_enabled,
+    receipts_enabled,
 )
 from app.db.database import get_db
 from app.schemas.invitation import MetaRead
@@ -35,4 +36,5 @@ def meta(db: Session = Depends(get_db)):
         default_plan=plans.default if plans.configured else None,
         billing=get_billing_url() is not None,
         inactive_delete_months=get_inactive_delete_months(),
+        receipts=receipts_enabled(),
     )

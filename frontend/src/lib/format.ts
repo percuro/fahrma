@@ -37,6 +37,8 @@ export interface Format {
   dateTime(local: string): string;
   /** A period of wall-clock times, compact when it stays within one day */
   span(startsAt: string, endsAt: string): string;
+  /** Storage in megabytes, one decimal at most: "12,3 MB"; at least 1000 MB as "1,2 GB" */
+  megabytes(mb: number): string;
   /** Cents as text for an input field: 1250 → "12,50" */
   moneyInput(cents: number | null | undefined): string;
   quantityInput(milli: number | null | undefined): string;
@@ -65,6 +67,7 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
   const integer = new Intl.NumberFormat(numberLocale, { maximumFractionDigits: 0 });
   const decimal = new Intl.NumberFormat(numberLocale, { maximumFractionDigits: 2 });
   const oneDecimal = new Intl.NumberFormat(numberLocale, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const upToOneDecimal = new Intl.NumberFormat(numberLocale, { maximumFractionDigits: 1 });
   const months = new Intl.DateTimeFormat(locale, { month: 'short', timeZone: 'UTC' });
   const narrowMonths = new Intl.DateTimeFormat(locale, { month: 'narrow', timeZone: 'UTC' });
   const dates = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
@@ -108,6 +111,7 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
       if (endsAtMidnight) return `${weekday(startsAt)}, ${time(startsAt)}–24:00`;
       return `${weekday(startsAt)}, ${time(startsAt)} – ${weekday(endsAt)}, ${time(endsAt)}`;
     },
+    megabytes: (mb) => (mb >= 1000 ? `${upToOneDecimal.format(mb / 1000)} GB` : `${upToOneDecimal.format(mb)} MB`),
     moneyInput: (cents) =>
       cents === null || cents === undefined ? '' : (cents / 100).toFixed(2).replace('.', decimalSeparator),
     quantityInput: (milli) =>

@@ -146,6 +146,12 @@ class ImportAuditEntry(_Row):
     created_at: dt.datetime | None = None
 
 
+class ImportReceipt(_Row):
+    """Only counted: the photos themselves are not in the file and do not move along."""
+
+    id: int
+
+
 class GroupExportFile(_Row):
     format: str
     app_version: str | None = Field(default=None, max_length=40)
@@ -162,6 +168,7 @@ class GroupExportFile(_Row):
     settlement_transfers: list[ImportTransfer] = []
     reservations: list[ImportReservation] = []
     audit_log: list[ImportAuditEntry] = []
+    receipts: list[ImportReceipt] = []
 
 
 class ImportMemberPreview(BaseModel):
@@ -179,6 +186,8 @@ class ImportCounts(BaseModel):
     expenses: int
     settlements: int
     reservations: int = 0
+    # Receipt photos in the old group; they are not imported (download them as a ZIP there)
+    receipts: int = 0
 
 
 class ImportPreview(BaseModel):

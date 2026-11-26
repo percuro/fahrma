@@ -14,6 +14,7 @@ import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
 import { LinkBox } from '../components/LinkBox';
 import { useMeta } from '../hooks/useMeta';
+import { receiptsZipUrl } from '../lib/receipts';
 
 const COMMON_CURRENCIES = ['EUR', 'CHF', 'GBP', 'USD', 'SEK', 'NOK', 'DKK', 'PLN', 'CZK', 'HUF'];
 
@@ -355,6 +356,10 @@ function PlanCard({ group }: { group: Group }) {
     [g.planMembers, plan.usage.members_per_group, plan.members_per_group],
     [g.planCars, plan.usage.cars_per_group, plan.cars_per_group],
   ];
+  // Storage for receipt photos, in MB: only where photos are on
+  const storage = meta.data.receipts && plan.usage.receipt_mb_per_group !== undefined
+    ? { used: plan.usage.receipt_mb_per_group, max: plan.receipt_mb_per_group ?? null }
+    : null;
   const change = () => link.mutate(undefined, { onSuccess: ({ url }) => window.location.assign(url) });
   return (
     <section className="card" aria-labelledby="plan-title">
@@ -373,6 +378,17 @@ function PlanCard({ group }: { group: Group }) {
             </span>
           </li>
         ))}
+        {storage && (
+          <li className="row">
+            <span className="main">{g.planReceipts}</span>
+            <span>
+              {storage.max === null
+                ? `${f.megabytes(storage.used)} · ${g.planUnlimited}`
+                : g.planUsage(f.megabytes(storage.used), f.megabytes(storage.max))}
+              {storage.max !== null && storage.used >= storage.max && <span className="subtle"> · {g.planFull}</span>}
+            </span>
+          </li>
+        )}
       </ul>
       <p className="subtle small">{g.planHint}</p>
       {isAdmin && meta.data.billing && (
@@ -447,6 +463,7 @@ function GroupSettings({ group }: { group: Group }) {
 
 function DataExport() {
   const t = useT();
+  const meta = useMeta();
   const { lang } = useI18n();
   const gid = useGroupId();
   return (
@@ -455,8 +472,10 @@ function DataExport() {
       <p className="button-row">
         <a className="button" href={apiUrl(`/v1/groups/${gid}/export.csv?lang=${lang}`)} download>{t.group.csv}</a>
         <a className="button" href={apiUrl(`/v1/groups/${gid}/export.json`)} download>{t.group.json}</a>
+        {meta.data?.receipts && <a className="button" href={receiptsZipUrl(gid)} download>{t.group.receiptsZip}</a>}
       </p>
       <p className="subtle small">{t.group.jsonHint}</p>
+      {meta.data?.receipts && <p className="subtle small">{t.group.receiptsZipHint}</p>}
     </section>
   );
 }

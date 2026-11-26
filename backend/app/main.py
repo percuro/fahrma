@@ -13,6 +13,7 @@ from app.api.routers.invitations import router as invitations_router
 from app.api.routers.meta import router as meta_router
 from app.api.routers.notifications import router as notifications_router
 from app.api.routers.operator import router as operator_router
+from app.api.routers.receipts import router as receipts_router
 from app.api.routers.reservations import router as reservations_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
@@ -48,5 +49,6 @@ app.include_router(cars_router, prefix=f"{group}/cars", tags=["cars"])
 app.include_router(trips_router, prefix=f"{group}/trips", tags=["trips"])
 app.include_router(fuel_router, prefix=f"{group}/fuel", tags=["fuel"])
 app.include_router(expenses_router, prefix=f"{group}/expenses", tags=["expenses"])
+app.include_router(receipts_router, prefix=group, tags=["receipts"])
 app.include_router(settlements_router, prefix=group, tags=["settlements"])
 app.include_router(reservations_router, prefix=f"{group}/reservations", tags=["reservations"])

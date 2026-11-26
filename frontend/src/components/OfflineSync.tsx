@@ -1,6 +1,8 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { syncDrafts } from '../lib/outbox';
+import { photosVersion, queuedPhotos, subscribePhotos, syncPhotos } from '../lib/photo-outbox';
+import { errorText } from '../lib/api';
 import { groupKey } from '../hooks/useGroupData';
 import { useDrafts, useOnline } from '../hooks/useDrafts';
 import { useSession } from '../hooks/useSession';
@@ -17,7 +19,8 @@ export function OfflineSync() {
   const queryClient = useQueryClient();
   const drafts = useDrafts();
   const online = useOnline();
-  const waiting = drafts.some((d) => !d.error);
+  const photos = useWaitingPhotos(me.id);
+  const waiting = drafts.some((d) => !d.error) || photos;
 
   useEffect(() => {
     if (!waiting || !online) return;
@@ -26,8 +29,13 @@ export function OfflineSync() {
       for (const gid of new Set(sent.map((d) => d.groupId))) {
         void queryClient.invalidateQueries({ queryKey: groupKey(gid) });
       }
+      const photoResult = await syncPhotos(me.id);
+      for (const gid of new Set(photoResult.sent.map((p) => p.groupId))) {
+        void queryClient.invalidateQueries({ queryKey: groupKey(gid) });
+      }
       if (sent.length > 0) toast(t.offline.sent(sent.length));
       if (failed.length > 0) toast(t.offline.failed(failed.length));
+      if (photoResult.failed.length > 0) toast(t.receipts.refused(errorText(photoResult.failed[0].error)));
     };
     const onVisible = () => {
       if (document.visibilityState === 'visible') void run();
@@ -42,6 +50,22 @@ export function OfflineSync() {
   }, [waiting, online, me.id, queryClient, toast, t]);
 
   return null;
+}
+
+/** Photos of this person wait on the device (re-checked whenever the queue changes). */
+function useWaitingPhotos(userId: number): boolean {
+  const version = useSyncExternalStore(subscribePhotos, photosVersion, photosVersion);
+  const [waiting, setWaiting] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void queuedPhotos().then((all) => {
+      if (active) setWaiting(all.some((p) => p.userId === userId));
+    });
+    return () => {
+      active = false;
+    };
+  }, [version, userId]);
+  return waiting;
 }
 
 /** Shown while the device reports no network. */

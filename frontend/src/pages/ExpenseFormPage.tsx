@@ -5,7 +5,7 @@ import { parseMoney } from '../lib/format';
 import type { Allocation, Car, Expense, ExpenseWrite, Group, Trip } from '../lib/types';
 import { findDraft, type Draft } from '../lib/outbox';
 import { todayIn } from '../lib/dates';
-import { useEntrySave } from '../hooks/useDrafts';
+import { useEntrySave, useSaveMessage, type PendingPhoto } from '../hooks/useDrafts';
 import { DiscardDraftButton, DraftNotice } from '../components/DraftNotice';
 import { useCars, useExpense, useGroup, useGroupId, useGroupMutation, useMemberNames, useTrips } from '../hooks/useGroupData';
 import { useSession } from '../hooks/useSession';
@@ -15,6 +15,7 @@ import { CarSelect } from '../components/CarSelect';
 import { MemberSelect } from '../components/MemberSelect';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
+import { ReceiptSection } from '../components/ReceiptSection';
 
 const CATEGORY_KEYS = ['other', 'insurance', 'tax', 'service', 'repair', 'inspection', 'tires', 'vignette', 'parking', 'toll', 'wash'];
 const ALLOCATION_KEYS: Allocation[] = ['by_km', 'equal', 'single', 'trip'];
@@ -71,7 +72,9 @@ function ExpenseForm({ group, cars, trips, entry, draft }: {
   const [localError, setLocalError] = useState('');
   const readOnly = !draft && entry?.settlement_id != null;
 
-  const save = useEntrySave('expense', entityId, draft);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
+  const save = useEntrySave('expense', entityId, draft, photos);
+  const saveMessage = useSaveMessage();
   const remove = useGroupMutation<void>('DELETE', () => `/expenses/${entry?.id}`);
 
   const finishedTrips = trips.filter((trip) => trip.end_km !== null).slice(0, 40);
@@ -102,7 +105,7 @@ function ExpenseForm({ group, cars, trips, entry, draft }: {
       },
       {
         onSuccess: (outcome) => {
-          toast(outcome === 'draft' ? t.offline.savedAsDraft : t.common.saved);
+          toast(saveMessage(outcome, save.photoError));
           navigate(`/g/${gid}`);
         },
       },
@@ -180,6 +183,8 @@ function ExpenseForm({ group, cars, trips, entry, draft }: {
             </label>
           ))}
         </fieldset>
+        <ReceiptSection kind="expense" entryId={draft ? draft.entityId : (entry?.id ?? null)} receipts={draft ? [] : (entry?.receipts ?? [])}
+          draftId={draft?.id} pending={photos} onPendingChange={setPhotos} canDelete={!readOnly} />
         {error && <p className="error" role="alert">{error}</p>}
         <div className="button-row">
           {!readOnly && <button type="submit" className="button primary" disabled={save.isPending}>{t.common.save}</button>}

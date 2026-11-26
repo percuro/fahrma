@@ -22,7 +22,13 @@ from tests.test_api import GroupSetupMixin
 PLANS = {
     "default": "free",
     "plans": [
-        {"id": "free", "name": {"de": "Gratis", "en": "Free"}, "members_per_group": 3, "cars_per_group": 1},
+        {
+            "id": "free",
+            "name": {"de": "Gratis", "en": "Free"},
+            "members_per_group": 3,
+            "cars_per_group": 1,
+            "receipt_mb_per_group": 1,
+        },
         {"id": "plus", "name": "Plus", "members_per_group": 25, "cars_per_group": 5},
         {"id": "club", "name": "Club"},
     ],
@@ -181,7 +187,10 @@ class PlanTests(HostingTestCase):
         self.assertEqual([plan["id"] for plan in meta["plans"]], ["free", "plus", "club"])
         self.assertEqual(meta["plans"][0]["name"], {"de": "Gratis", "en": "Free"})
         self.assertEqual(meta["default_plan"], "free")
-        self.assertEqual(meta["limits"], {"groups_per_user": None, "members_per_group": 3, "cars_per_group": 1})
+        self.assertEqual(
+            meta["limits"],
+            {"groups_per_user": None, "members_per_group": 3, "cars_per_group": 1, "receipt_mb_per_group": 1},
+        )
         self.assertFalse(meta["billing"])
 
     def test_meta_without_plans(self):
@@ -194,7 +203,7 @@ class PlanTests(HostingTestCase):
     def test_group_shows_its_plan_and_usage(self):
         plan = self.alex.get(self.base).json()["plan"]
         self.assertEqual(plan["id"], "free")
-        self.assertEqual(plan["usage"], {"members_per_group": 2, "cars_per_group": 1})
+        self.assertEqual(plan["usage"], {"members_per_group": 2, "cars_per_group": 1, "receipt_mb_per_group": 0.0})
         self.assertEqual((plan["members_per_group"], plan["cars_per_group"], plan["until"]), (3, 1, None))
         self.set_plan("plus", until=FUTURE, note="Invoice 2026-001")
         group = self.sam.get(self.base).json()
@@ -268,7 +277,7 @@ class PlanTests(HostingTestCase):
             (group["name"], group["plan"], group["plan_until"], group["plan_note"], group["effective_plan"]),
             ("Test group", "plus", FUTURE, "Invoice 2026-001", "plus"),
         )
-        self.assertEqual(group["usage"], {"members_per_group": 2, "cars_per_group": 1})
+        self.assertEqual(group["usage"], {"members_per_group": 2, "cars_per_group": 1, "receipt_mb_per_group": 0.0})
         self.assertEqual(group["admins"], [{"user_id": self.alex_id, "display_name": "Alex"}])
         self.assertIsNotNone(group["last_activity_at"])
         # Nothing about entries or amounts

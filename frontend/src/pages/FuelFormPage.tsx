@@ -6,7 +6,7 @@ import { defaultCarId, energyKind } from '../lib/cars';
 import type { Car, Fuel, FuelWrite, Group, Trip } from '../lib/types';
 import { findDraft, type Draft } from '../lib/outbox';
 import { todayIn } from '../lib/dates';
-import { useEntrySave } from '../hooks/useDrafts';
+import { useEntrySave, useSaveMessage, type PendingPhoto } from '../hooks/useDrafts';
 import { DiscardDraftButton, DraftNotice } from '../components/DraftNotice';
 import { useCars, useFuelEntry, useGroup, useGroupId, useGroupMutation, useTrips } from '../hooks/useGroupData';
 import { useSession } from '../hooks/useSession';
@@ -16,6 +16,7 @@ import { CarSelect } from '../components/CarSelect';
 import { MemberSelect } from '../components/MemberSelect';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
+import { ReceiptSection } from '../components/ReceiptSection';
 
 export function FuelFormPage() {
   const { fuelId } = useParams();
@@ -63,7 +64,9 @@ function FuelForm({ group, cars, entry, recentTrips, draft }: {
   const unit = car?.energy_unit ?? (energyKind(cars) === 'charge' ? 'kWh' : 'l');
   const electric = unit === 'kWh';
 
-  const save = useEntrySave('fuel', entityId, draft);
+  const [photos, setPhotos] = useState<PendingPhoto[]>([]);
+  const save = useEntrySave('fuel', entityId, draft, photos);
+  const saveMessage = useSaveMessage();
   const remove = useGroupMutation<void>('DELETE', () => `/fuel/${entry?.id}`);
 
   const cents = parseMoney(amount);
@@ -92,7 +95,7 @@ function FuelForm({ group, cars, entry, recentTrips, draft }: {
       },
       {
         onSuccess: (outcome) => {
-          toast(outcome === 'draft' ? t.offline.savedAsDraft : t.common.saved);
+          toast(saveMessage(outcome, save.photoError));
           navigate(`/g/${gid}`);
         },
       },
@@ -153,6 +156,8 @@ function FuelForm({ group, cars, entry, recentTrips, draft }: {
             <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} />
           </label>
         </fieldset>
+        <ReceiptSection kind="fuel" entryId={draft ? draft.entityId : (entry?.id ?? null)} receipts={draft ? [] : (entry?.receipts ?? [])}
+          draftId={draft?.id} pending={photos} onPendingChange={setPhotos} canDelete={!readOnly} />
         {error && <p className="error" role="alert">{error}</p>}
         <div className="button-row">
           {!readOnly && <button type="submit" className="button primary" disabled={save.isPending}>{t.common.save}</button>}
