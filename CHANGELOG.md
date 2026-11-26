@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.10.0-rc.1 – 2026-11-26
+## 0.10.0 – 2026-11-26
 
 Receipt photos: a photo of the receipt on fuel entries and expenses, straight from the phone camera, with storage per plan.
 
