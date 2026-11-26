@@ -71,12 +71,15 @@ jobs:
           cache-to: type=gha,mode=max
       - name: Start instance
         run: |
-          # Mails and push notifications are written as files the tests read (MAIL_DIR, PUSH_DIR)
+          # Mails and push notifications are written as files the tests read (MAIL_DIR, PUSH_DIR);
+          # plans as in e2e/plans.json, with an unlimited default so other tests are not limited
           mkdir -m 777 /tmp/mail /tmp/push
           docker run -d --name app -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 \
             -e REGISTRATION=open -e TERMS_URL=https://example.org/terms -e IMPRINT_URL=https://example.org/imprint \
             -e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail \
-            -e PUSH_DIR=/push -v /tmp/push:/push app:ci
+            -e PUSH_DIR=/push -v /tmp/push:/push \
+            -e PLANS_FILE=/config/plans.json -v "$PWD/e2e/plans.json:/config/plans.json:ro" \
+            -e BILLING_URL=https://example.org/plans app:ci
           for i in $(seq 1 60); do
             curl -fsS http://localhost:8000/api/health && break
             sleep 1

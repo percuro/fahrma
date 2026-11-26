@@ -1,0 +1,7 @@
+{
+  "default": "open",
+  "plans": [
+    {"id": "open", "name": {"de": "Offen", "en": "Open"}},
+    {"id": "small", "name": {"de": "Klein", "en": "Small"}, "members_per_group": 3, "cars_per_group": 1}
+  ]
+}

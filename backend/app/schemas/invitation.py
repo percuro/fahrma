@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.auth import LOCALE_PATTERN, Email, RoleLiteral
+from app.schemas.plans import PlanInfo
 
 PurposeLiteral = Literal["signup", "password_reset", "verify_email", "registration"]
 KindLiteral = Literal["group", "signup", "password_reset", "verify_email", "registration"]
@@ -111,3 +112,9 @@ class MetaRead(BaseModel):
     mail: bool
     # Web Push: the key for PushManager.subscribe(); None = push notifications are off
     vapid_public_key: str | None = None
+    # Hosting: the plans groups can have (None = no PLANS_FILE), and whether group admins
+    # can change their plan (BILLING_URL is set)
+    plans: list[PlanInfo] | None = None
+    # The plan of every group without its own (id from plans)
+    default_plan: str | None = None
+    billing: bool = False

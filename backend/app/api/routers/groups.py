@@ -22,11 +22,14 @@ from app.schemas.group import (
 )
 from app.schemas.group_import import ImportPreview
 from app.schemas.invitation import GroupInviteCreated
+from app.schemas.plans import BillingLink
 from app.services import audit_service, group_import, group_service
 from app.services.access import GroupContext, load_group_context
+from app.services.billing_link import billing_link
 from app.services.group_export import export_group
 from app.services.invitation_service import InvitationService, client_ip
 from app.services.mail import check_account_quota, require_mail
+from app.services.plans import effective_plan
 
 router = APIRouter()
 
@@ -171,3 +174,10 @@ def create_personal_invite(
 @router.get("/{group_id}/audit", response_model=list[AuditRead])
 def audit(ctx: GroupContext = Depends(require_member)):
     return audit_service.list_entries(ctx)
+
+
+@router.post("/{group_id}/billing-link", response_model=BillingLink)
+def create_billing_link(ctx: GroupContext = Depends(require_member), today: date = Depends(get_group_today)):
+    """Where a group admin changes the group's plan: BILLING_URL with the group (and a signed token)."""
+    ctx.require_admin()
+    return {"url": billing_link(ctx.group, ctx.user, effective_plan(ctx.group, today).id)}

@@ -41,6 +41,14 @@ TEST_ENV = {
     "VAPID_SUBJECT": "",
     "VAPID_PRIVATE_KEY_FILE": "",
     "PUSH_ALLOWED_HOSTS": "",
+    # Hosting: no plans, no billing, operator API off unless a test sets them
+    "MAX_GROUPS_PER_USER": "",
+    "MAX_MEMBERS_PER_GROUP": "",
+    "MAX_CARS_PER_GROUP": "",
+    "PLANS_FILE": "",
+    "BILLING_URL": "",
+    "OPERATOR_TOKEN": "",
+    "OPERATOR_TOKEN_FILE": "",
 }
 HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 

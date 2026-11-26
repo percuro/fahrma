@@ -4,8 +4,10 @@ Only PUBLIC_URL is required in production; everything else has a safe default.
 See docs/configuration.md for the full reference.
 """
 
+import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from email.utils import parseaddr
 from functools import lru_cache
@@ -177,6 +179,180 @@ def get_limit(name: str) -> int | None:
     return number or None
 
 
+# Limits that belong to a group and therefore to its plan; MAX_GROUPS_PER_USER stays per instance
+GROUP_LIMITS = {"members_per_group": "MAX_MEMBERS_PER_GROUP", "cars_per_group": "MAX_CARS_PER_GROUP"}
+DEFAULT_PLAN_ID = "default"
+_PLAN_ID = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+_LOCALE = re.compile(r"^[a-z]{2}$")
+
+
+@dataclass(frozen=True)
+class Plan:
+    id: str
+    # Shown to people; one text, or one per language ({"de": "Gratis", "en": "Free"})
+    name: str | dict[str, str]
+    # None = unlimited
+    members_per_group: int | None
+    cars_per_group: int | None
+
+    def limit(self, name: str) -> int | None:
+        return getattr(self, name)
+
+
+@dataclass(frozen=True)
+class PlanSettings:
+    # In the order of the file: usually the smallest first
+    plans: dict[str, Plan]
+    # The plan of every group without its own (or whose own plan has run out)
+    default: str
+    # PLANS_FILE is set: plans are shown in the app; otherwise one implicit plan from MAX_*
+    configured: bool
+
+    @property
+    def default_plan(self) -> Plan:
+        return self.plans[self.default]
+
+
+def _plan_limit(raw: dict, key: str, where: str) -> int | None:
+    value = raw.get(key)
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ConfigError(f"PLANS_FILE: {where}.{key} must be a whole number of at least 0 or null (got {value!r})")
+    return value or None
+
+
+def _plan_name(raw: dict, where: str) -> str | dict[str, str]:
+    name = raw.get("name")
+    if isinstance(name, str) and name.strip() and len(name) <= 40:
+        return name.strip()
+    if (
+        isinstance(name, dict)
+        and name
+        and all(isinstance(k, str) and _LOCALE.match(k) for k in name)
+        and all(isinstance(v, str) and v.strip() and len(v) <= 40 for v in name.values())
+    ):
+        return {k: v.strip() for k, v in name.items()}
+    raise ConfigError(
+        f'PLANS_FILE: {where}.name must be a text of up to 40 characters or {{"de": "…", "en": "…"}} (got {name!r})'
+    )
+
+
+def _parse_plans(text: str) -> PlanSettings:
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        raise ConfigError(f"PLANS_FILE is not valid JSON: {exc}") from exc
+    if not isinstance(data, dict) or set(data) - {"default", "plans"}:
+        raise ConfigError('PLANS_FILE must be an object with the keys "default" and "plans"')
+    raw_plans = data.get("plans")
+    if not isinstance(raw_plans, list) or not raw_plans:
+        raise ConfigError('PLANS_FILE: "plans" must be a non-empty list')
+    plans: dict[str, Plan] = {}
+    allowed = {"id", "name", *GROUP_LIMITS}
+    for index, raw in enumerate(raw_plans):
+        where = f"plans[{index}]"
+        if not isinstance(raw, dict):
+            raise ConfigError(f"PLANS_FILE: {where} must be an object")
+        unknown = sorted(set(raw) - allowed)
+        if unknown:
+            raise ConfigError(f"PLANS_FILE: {where} has unknown keys {', '.join(unknown)}")
+        plan_id = raw.get("id")
+        if not isinstance(plan_id, str) or not _PLAN_ID.match(plan_id):
+            raise ConfigError(f"PLANS_FILE: {where}.id must be 1-32 of a-z, 0-9, - and _ (got {plan_id!r})")
+        if plan_id in plans:
+            raise ConfigError(f"PLANS_FILE: the id {plan_id!r} appears twice")
+        plans[plan_id] = Plan(
+            id=plan_id,
+            name=_plan_name(raw, where),
+            members_per_group=_plan_limit(raw, "members_per_group", where),
+            cars_per_group=_plan_limit(raw, "cars_per_group", where),
+        )
+    default = data.get("default")
+    if default not in plans:
+        raise ConfigError(f'PLANS_FILE: "default" must be the id of one of the plans (got {default!r})')
+    return PlanSettings(plans=plans, default=default, configured=True)
+
+
+@lru_cache(maxsize=4)
+def _read_plans(path: str, modified: int) -> PlanSettings:
+    """Cached per file and modification time: editing the file takes effect without a restart."""
+    try:
+        text = Path(path).read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ConfigError(f"PLANS_FILE cannot be read: {exc}") from exc
+    return _parse_plans(text)
+
+
+# The last valid content per PLANS_FILE: a file broken while running does not break the app
+_last_good_plans: dict[str, PlanSettings] = {}
+_reported_plan_errors: set[str] = set()
+
+
+def get_plans(strict: bool = False) -> PlanSettings:
+    """The plans a group can have. Without PLANS_FILE there is one plan with the MAX_* limits.
+
+    If the file becomes invalid while running, the last valid content stays in force and the
+    error is logged; ``strict`` (at startup) raises instead.
+    """
+    path = os.getenv("PLANS_FILE", "").strip()
+    if not path:
+        return PlanSettings(
+            plans={
+                DEFAULT_PLAN_ID: Plan(
+                    id=DEFAULT_PLAN_ID,
+                    name=DEFAULT_PLAN_ID,
+                    members_per_group=get_limit("MAX_MEMBERS_PER_GROUP"),
+                    cars_per_group=get_limit("MAX_CARS_PER_GROUP"),
+                )
+            },
+            default=DEFAULT_PLAN_ID,
+            configured=False,
+        )
+    both = [name for name in GROUP_LIMITS.values() if os.getenv(name, "").strip()]
+    if both:
+        raise ConfigError(f"Set the limits per plan in PLANS_FILE instead of {', '.join(both)}")
+    try:
+        try:
+            modified = os.stat(path).st_mtime_ns
+        except OSError as exc:
+            raise ConfigError(f"PLANS_FILE cannot be read: {exc}") from exc
+        settings = _read_plans(path, modified)
+    except ConfigError as exc:
+        last_good = _last_good_plans.get(path)
+        if strict or last_good is None:
+            raise
+        if str(exc) not in _reported_plan_errors:
+            _reported_plan_errors.add(str(exc))
+            logger.error("%s – keeping the plans read before", exc)
+        return last_good
+    _last_good_plans[path] = settings
+    _reported_plan_errors.clear()
+    return settings
+
+
+def get_billing_url() -> str | None:
+    """Where group admins go to change their group's plan (a pricing page or a billing service)."""
+    value = _optional_url("BILLING_URL")
+    if value and "#" in value:
+        raise ConfigError("BILLING_URL must not contain a fragment (#); fahrma adds one")
+    return value
+
+
+def get_operator_token() -> str | None:
+    """Bearer token of the operator API (and key of the billing links); None = operator API off."""
+    token = os.getenv("OPERATOR_TOKEN", "").strip() or None
+    token_file = os.getenv("OPERATOR_TOKEN_FILE", "").strip()
+    if token_file:
+        try:
+            token = Path(token_file).read_text(encoding="utf-8").strip() or None
+        except OSError as exc:
+            raise ConfigError(f"OPERATOR_TOKEN_FILE cannot be read: {exc}") from exc
+    if token is not None and len(token) < 32:
+        raise ConfigError("OPERATOR_TOKEN must be at least 32 characters long, e.g. from `openssl rand -hex 32`")
+    return token
+
+
 SMTP_SECURITY_MODES = {"starttls": 587, "tls": 465, "none": 25}
 
 
@@ -289,5 +465,8 @@ def validate() -> None:
     get_operator_links()
     for name in LIMIT_NAMES:
         get_limit(name)
+    get_plans(strict=True)
+    get_billing_url()
+    get_operator_token()
     get_mail_settings()
     get_push_settings()

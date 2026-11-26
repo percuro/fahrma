@@ -12,6 +12,7 @@ from app.api.routers.health import router as health_router
 from app.api.routers.invitations import router as invitations_router
 from app.api.routers.meta import router as meta_router
 from app.api.routers.notifications import router as notifications_router
+from app.api.routers.operator import router as operator_router
 from app.api.routers.reservations import router as reservations_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
@@ -39,6 +40,8 @@ protected = [Depends(require_user)]
 app.include_router(account_router, prefix="/v1/account", tags=["account"], dependencies=protected)
 app.include_router(notifications_router, prefix="/v1/account", tags=["notifications"], dependencies=protected)
 app.include_router(admin_router, prefix="/v1/admin", tags=["admin"], dependencies=[Depends(require_admin)])
+# Bearer token instead of a login; exempt from the CSRF check (see app.middleware.csrf)
+app.include_router(operator_router, prefix="/v1/operator", tags=["operator"])
 app.include_router(groups_router, prefix="/v1/groups", tags=["groups"], dependencies=protected)
 group = "/v1/groups/{group_id}"
 app.include_router(cars_router, prefix=f"{group}/cars", tags=["cars"])

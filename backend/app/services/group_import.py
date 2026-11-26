@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.config import get_limit, is_valid_timezone
+from app.config import get_plans, is_valid_timezone
 from app.errors import AppError
 from app.models.audit import AuditEntry
 from app.models.car import Car
@@ -34,7 +34,7 @@ from app.schemas.group_import import (
     ImportPreview,
 )
 from app.services.auth_service import utcnow
-from app.services.limits import check_new_group
+from app.services.limits import check_count, check_new_group
 from app.services.placeholders import new_deleted_user, new_placeholder
 from app.services.snapshots import SnapshotError, dumps, remap_snapshot
 
@@ -195,19 +195,14 @@ def _check_references(data: GroupExportFile) -> None:
 
 
 def _check_limits(data: GroupExportFile) -> None:
-    for limit_name, env_name, count in (
-        ("members_per_group", "MAX_MEMBERS_PER_GROUP", sum(1 for m in data.members if m.active and not m.deleted)),
-        ("cars_per_group", "MAX_CARS_PER_GROUP", sum(1 for c in data.cars if not c.archived)),
+    """An imported group starts with the default plan, so it has to fit into that plan."""
+    plan = get_plans().default_plan
+    for name, count in (
+        ("members_per_group", sum(1 for m in data.members if m.active and not m.deleted)),
+        ("cars_per_group", sum(1 for c in data.cars if not c.archived)),
     ):
-        maximum = get_limit(env_name)
-        if maximum is not None and count > maximum:
-            raise AppError(
-                status.HTTP_409_CONFLICT,
-                "limit_reached",
-                f"Limit reached: at most {maximum}",
-                limit=limit_name,
-                max=maximum,
-            )
+        if count > 0:
+            check_count(name, count - 1, plan)
 
 
 def import_group(db: Session, user: User, data: GroupExportFile, member_id: int) -> Group:

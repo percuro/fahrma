@@ -41,6 +41,31 @@ export interface Group {
   today: string;
   my_role: 'admin' | 'member';
   members: Member[];
+  /** Since 0.9; missing in group data a device kept from an older version */
+  plan?: GroupPlan;
+}
+
+/** A plan's name: one text, or one per language ({"de": "Gratis", "en": "Free"}). */
+export type PlanName = string | Record<string, string>;
+
+export interface PlanInfo {
+  id: string;
+  name: PlanName;
+  /** null = unlimited */
+  members_per_group: number | null;
+  cars_per_group: number | null;
+}
+
+export interface PlanUsage {
+  members_per_group: number;
+  cars_per_group: number;
+}
+
+/** The plan in force for a group. */
+export interface GroupPlan extends PlanInfo {
+  /** Last day of the group's own plan; null = no end */
+  until: string | null;
+  usage: PlanUsage;
 }
 
 export type EnergyUnit = 'l' | 'kWh';
@@ -226,6 +251,12 @@ export interface Meta {
   mail: boolean;
   /** Web Push: the key for subscribing; null = push notifications are off on this instance */
   vapid_public_key: string | null;
+  /** Plans groups can have; null = this instance has no plans */
+  plans?: PlanInfo[] | null;
+  /** The plan of every group without its own */
+  default_plan?: string | null;
+  /** Group admins can change their plan (the operator set up a page for it) */
+  billing?: boolean;
 }
 
 export interface DeviceSession {
@@ -252,6 +283,21 @@ export interface AdminUser {
   created_at: string;
   last_seen_at: string | null;
   group_count: number;
+}
+
+/** A group as instance admins see it: plan and counts, never entries or amounts. */
+export interface AdminGroup {
+  id: number;
+  name: string;
+  created_at: string;
+  last_activity_at: string | null;
+  /** The group's own plan as stored; it may have run out (see effective_plan) */
+  plan: string | null;
+  plan_until: string | null;
+  plan_note: string | null;
+  effective_plan: string;
+  usage: PlanUsage;
+  admins: { user_id: number; display_name: string }[];
 }
 
 export interface InvitationCreated {

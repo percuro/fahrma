@@ -60,12 +60,17 @@ ROUTES = {
     ("GET", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, None),
     ("PUT", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, {**RESERVATION, "car_id": 1}),
     ("DELETE", "/v1/groups/{group_id}/reservations/{reservation_id}"): (404, None),
+    ("POST", "/v1/groups/{group_id}/billing-link"): (404, None),
     ("DELETE", "/v1/account/sessions/{session_id}"): (404, None),
     # Admin routes act on other accounts by design: a normal account gets 403
     ("PATCH", "/v1/admin/users/{user_id}"): (403, {"is_active": False}),
     ("DELETE", "/v1/admin/users/{user_id}"): (403, None),
     ("POST", "/v1/admin/users/{user_id}/password-reset"): (403, None),
     ("DELETE", "/v1/admin/invitations/{invitation_id}"): (403, None),
+    ("PUT", "/v1/admin/groups/{group_id}/plan"): (403, {"plan": None}),
+    # The operator API ignores logins; it is off without OPERATOR_TOKEN (test_operator.py)
+    ("GET", "/v1/operator/groups/{group_id}"): (404, None),
+    ("PUT", "/v1/operator/groups/{group_id}/plan"): (404, {"plan": None}),
 }
 
 # Routes inside a group that take the ID of an object of that group
@@ -175,7 +180,7 @@ class IsolationTest(unittest.TestCase):
         self.env.create_user("dora")
         outsider = self.env.client("dora")
         for (method, path), (_expected, body) in ROUTES.items():
-            if not path.startswith("/v1/admin"):
+            if not path.startswith(("/v1/admin", "/v1/operator")):
                 outsider.request(method, path.format(**self.bert_ids), json=body)
         after = self.bert.get(f"/v1/groups/{self.bert_ids['group_id']}/export.json").json()
         for key in (
