@@ -59,10 +59,21 @@ async function transaction<T>(mode: IDBTransactionMode, run: (store: IDBObjectSt
   return request(run(db.transaction(STORE, mode).objectStore(STORE)));
 }
 
+/**
+ * Stored as bytes, not as a Blob: Safari cannot keep Blobs in IndexedDB in a private window
+ * (nor WebKit in other ephemeral sessions), while an ArrayBuffer works everywhere.
+ */
+type StoredPhoto = Omit<QueuedPhoto, 'blob'> & { data: ArrayBuffer; type: string };
+
 const indexedDbStore: PhotoStore = {
-  all: () => transaction('readonly', (store) => store.getAll() as IDBRequest<QueuedPhoto[]>),
-  put: async (photo) => {
-    await transaction('readwrite', (store) => store.put(photo));
+  all: async () => {
+    const rows = await transaction('readonly', (store) => store.getAll() as IDBRequest<StoredPhoto[]>);
+    return rows.map(({ data, type, ...photo }) => ({ ...photo, blob: new Blob([data], { type }) }));
+  },
+  put: async ({ blob, ...photo }) => {
+    // Read before the transaction starts: it would close while waiting for the bytes
+    const stored: StoredPhoto = { ...photo, data: await blob.arrayBuffer(), type: blob.type || 'image/jpeg' };
+    await transaction('readwrite', (store) => store.put(stored));
   },
   remove: async (key) => {
     await transaction('readwrite', (store) => store.delete(key));
