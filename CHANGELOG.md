@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.10.0-rc.1 – 2026-11-26
+
+Receipt photos: a photo of the receipt on fuel entries and expenses, straight from the phone camera, with storage per plan.
+
+- **Receipt photos:** up to five per fuel entry or expense – *Take photo* opens the camera, *Choose from photos* the library. The entry shows them as thumbnails, a tap opens them large; the history marks entries with a receipt.
+- **Shrunk on the phone** before sending: at most 1600 pixels on the longer side, usually 150–400 KB. Re-encoding drops the photo's metadata, such as where it was taken.
+- **Evidence, not amounts:** photos can still be added to a settled entry; deleting one is only possible until the entry is settled. Both are in the change log.
+- **Without a connection** photos wait on the device with the entry's draft and are sent after it, never twice. Logging out or discarding the draft removes them.
+- **Storage per plan:** `receipt_mb_per_group` in `PLANS_FILE`, or `MAX_RECEIPT_MB_PER_GROUP` without plans. The group page, the instance administration and the operator API show how much a group uses. A full group keeps every photo and only cannot add more until it deletes some or gets a bigger plan.
+- **Your data:** Group → Data offers all photos as a ZIP, named by date, kind and entry. The JSON export lists them; a group moved to another instance arrives without its photos, and the import says so.
+- `RECEIPTS=off` turns photos off; `RECEIPTS_DIR` and `MAX_RECEIPT_KB` set where they go and how large one may be. See [configuration](docs/configuration.md#receipt-photos).
+- `app.cli.stats` counts receipts and their megabytes.
+- Also in this release: the fix from 0.9.1-rc.1 – date and time fields stay inside their card on iPhone and iPad.
+
+### Security
+
+- Photos are accepted only as JPEG or WebP, checked by their content, and served only to members of the group with their exact type, `nosniff` and a Content-Security-Policy that lets nothing in them run (`sandbox`).
+- Files are removed only after the deletion of their entry, group or account is committed; an hourly cleanup removes leftovers of interrupted uploads and only ever touches files fahrma wrote itself.
+- The app's Content-Security-Policy allows `blob:` images, for the preview of a photo before it is sent.
+
+### Upgrade notes
+
+- **Back up the photos:** they are files in `receipts/` on the data volume, next to the database, and **not** in the `app.cli.dump_sql` dump. Add the directory to your backup, see [self-hosting](docs/self-hosting.md#backup-and-restore).
+- Migration `0010` adds the table `receipts`.
+- New optional settings `RECEIPTS`, `RECEIPTS_DIR`, `MAX_RECEIPT_KB`, `MAX_RECEIPT_MB_PER_GROUP`; plans can have `receipt_mb_per_group`. Without them photos are on, stored next to the database, without a storage limit.
+- API: fuel entries and expenses have `receipts`; new `POST /v1/groups/{id}/fuel/{id}/receipts` and `…/expenses/{id}/receipts` (the raw image as body, optional `Idempotency-Key`), `GET` and `DELETE /v1/groups/{id}/receipts/{id}`, `GET /v1/groups/{id}/receipts.zip`. `usage` and the plans have `receipt_mb_per_group`, `/v1/meta` has `receipts`, the import preview counts `receipts`. New error codes `receipt_too_large`, `receipt_invalid`, `receipt_type`, `receipt_count`, `receipt_not_found`, `receipts_off`; `limit_reached` can name `receipt_mb_per_group`.
+- The image is based on Python 3.13.17.
+- The roadmap moves: login via OpenID Connect is planned for 0.11.
+
 ## 0.9.1-rc.1 – 2026-11-26
 
 - Fixed: on iPhone and iPad, date and time fields stuck out of narrow forms on the right and showed their value centred. They now have the width of the other fields and start on the left; tapping still opens the picker.
