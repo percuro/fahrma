@@ -126,10 +126,18 @@ export function Devices() {
 
 export function MyData() {
   const a = useT().account;
+  const meta = useMeta();
+  const me = useSession();
+  const months = meta.data?.inactive_delete_months;
+  // Instance admins are never deleted for being unused
+  const inactive = months && me.role !== 'admin'
+    ? `${a.inactiveRule(months)} ${!meta.data?.mail ? a.inactiveNoMail : me.email ? a.inactiveWarnMail : a.inactiveAddMail}`
+    : null;
   return (
     <section>
       <h2>{a.myData}</h2>
       <p className="subtle small">{a.myDataHint}</p>
+      {inactive && <p className="subtle small">{inactive}</p>}
       <p><a className="button" href={apiUrl('/v1/account/export.json')} download>{a.download}</a></p>
     </section>
   );

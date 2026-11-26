@@ -257,6 +257,8 @@ export interface Meta {
   default_plan?: string | null;
   /** Group admins can change their plan (the operator set up a page for it) */
   billing?: boolean;
+  /** Accounts unused for this many months are deleted after a warning; null = never */
+  inactive_delete_months?: number | null;
 }
 
 export interface DeviceSession {
@@ -283,6 +285,8 @@ export interface AdminUser {
   created_at: string;
   last_seen_at: string | null;
   group_count: number;
+  /** The day a warned, unused account will be deleted */
+  deletion_due?: string | null;
 }
 
 /** A group as instance admins see it: plan and counts, never entries or amounts. */

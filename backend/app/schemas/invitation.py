@@ -118,3 +118,5 @@ class MetaRead(BaseModel):
     # The plan of every group without its own (id from plans)
     default_plan: str | None = None
     billing: bool = False
+    # Accounts unused for this many months are deleted (after a warning); None = never
+    inactive_delete_months: int | None = None

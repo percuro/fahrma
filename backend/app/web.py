@@ -20,7 +20,7 @@ from app import config
 from app.db.database import SessionLocal
 from app.main import app as api
 from app.middleware.security_headers import add_security_headers
-from app.services import notification_service, setup_service
+from app.services import inactive_accounts, notification_service, setup_service
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -73,9 +73,11 @@ async def lifespan(_app: FastAPI):
         raise
     announce_setup_token()
     reminders = asyncio.create_task(remind()) if config.push_enabled() else None
+    cleanup = asyncio.create_task(delete_inactive()) if config.get_inactive_delete_months() else None
     yield
-    if reminders is not None:
-        reminders.cancel()
+    for task in (reminders, cleanup):
+        if task is not None:
+            task.cancel()
 
 
 # Reminders by Web Push: one round a minute, in a thread so requests never wait for it.
@@ -92,6 +94,24 @@ async def remind() -> None:
             logger.warning("Reminders skipped: database not ready")
         except Exception:
             logger.exception("Reminders failed")
+
+
+# INACTIVE_DELETE_MONTHS: warn and delete unused accounts, once an hour (first round after
+# a few minutes, so a restart loop never runs it in quick succession)
+INACTIVE_FIRST_DELAY_SECONDS = 5 * 60
+INACTIVE_INTERVAL_SECONDS = 60 * 60
+
+
+async def delete_inactive() -> None:
+    await asyncio.sleep(INACTIVE_FIRST_DELAY_SECONDS)
+    while True:
+        try:
+            await asyncio.to_thread(inactive_accounts.run_scheduled, SessionLocal)
+        except OperationalError:
+            logger.warning("Inactive accounts skipped: database not ready")
+        except Exception:
+            logger.exception("Deleting inactive accounts failed")
+        await asyncio.sleep(INACTIVE_INTERVAL_SECONDS)
 
 
 def announce_setup_token() -> None:

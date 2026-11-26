@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel
 
@@ -18,6 +18,8 @@ class AdminUserRead(BaseModel):
     created_at: datetime
     last_seen_at: datetime | None
     group_count: int
+    # INACTIVE_DELETE_MONTHS: the day this account will be deleted unless it is used again
+    deletion_due: date | None = None
 
 
 class AdminUserUpdate(BaseModel):

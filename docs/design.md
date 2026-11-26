@@ -28,7 +28,7 @@ The interface is German and English; each person picks a language or follows the
 
 ## Deleting without breaking the books
 
-A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. Instance admins manage accounts and plans, never contents: the administration page shows names, roles, activity and each group's plan and size, but no groups' trips or amounts.
+A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. An operator can let accounts nobody uses go the same way, after a warning and a grace period; using the app again is all it takes to keep one. Instance admins are never deleted that way, so an instance cannot lose all of them while nobody looks. Instance admins manage accounts and plans, never contents: the administration page shows names, roles, activity and each group's plan and size, but no groups' trips or amounts.
 
 ## People without an account
 

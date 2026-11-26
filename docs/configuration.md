@@ -36,6 +36,7 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `BILLING_URL` | – | Page where group admins change their group's plan (pricing page, contact form or your billing service); the group page then shows *Change plan*. See [Plans](#plans). |
 | `OPERATOR_TOKEN` | – | Turns on the [operator API](operator-api.md) for your own tools, e.g. a billing service; at least 32 characters (`openssl rand -hex 32`). Also signs the billing links. |
 | `OPERATOR_TOKEN_FILE` | – | Read the token from a file instead (e.g. a Docker secret); wins over `OPERATOR_TOKEN`. |
+| `INACTIVE_DELETE_MONTHS` | – (never) | Delete accounts that have not been used for this many months (at least 3), after a warning; see [Deleting unused accounts](#deleting-unused-accounts). |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 | `API_DOCS` | `false` | `true` serves the OpenAPI documentation at `/api/docs`. Meant for development. |
 | `FRONTEND_DIST` | `/app/frontend` in the image | Directory with the built frontend. Unset: API only (development with Vite). |
@@ -92,6 +93,17 @@ A group's plan can have a last day (*valid until*, in the group's time zone); af
 Changes to the file take effect without a restart. An invalid file stops the start with a message; if it becomes invalid while running, the plans read before stay in force and the error is logged. Plans and their limits are public (`/api/v1/meta`), so the app can show them.
 
 With `BILLING_URL`, group admins see *Change plan* on the group page. It opens `BILLING_URL#group=<id>&plan=<current plan>` – and, with `OPERATOR_TOKEN`, `&token=<signed token>` that your billing service can check through the operator API, see [operator-api.md](operator-api.md#billing-links). The part after `#` never reaches access logs.
+
+## Deleting unused accounts
+
+When you host fahrma for others, personal data should not stay forever. With `INACTIVE_DELETE_MONTHS=24`, say, an account nobody has used for 24 months is deleted exactly as if its owner had deleted it: login, name and e-mail address go, the trips and payments stay under an anonymous name in groups that have other members, and groups without other members are deleted with everything in them.
+
+- **Warning:** 30 days before, by e-mail to the account's confirmed address. Using the app in between – any request with a valid login counts – cancels it. Accounts without an address (or without e-mail on the instance) are not warned but get the same 30 days after the moment they would have been, so switching the setting on never deletes anything on the same day.
+- **Never deleted automatically:** instance admins, and accounts an admin deactivated (that is the admins' decision). People without an account are part of their groups and go with them.
+- **When:** a round runs inside the app once an hour (the first a few minutes after the start). The administration page shows *will be deleted on …* for warned accounts, and the profile tells people the rule.
+- **Before switching it on:** `python -m app.cli.inactive --months 24` counts what would be warned and deleted, without changing anything; `--run` runs one round now.
+
+Say in your privacy policy how long unused accounts are kept.
 
 ## Limits
 

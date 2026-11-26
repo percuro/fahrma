@@ -46,6 +46,10 @@ def collect(db: Session) -> dict:
         "admins": _count(db, accounts.where(User.role == "admin", User.is_active.is_(True))),
         "people_without_account": _count(db, select(func.count()).select_from(User).where(User.placeholder.is_(True))),
         "accounts_deleted": _count(db, select(func.count()).select_from(User).where(User.deleted_at.is_not(None))),
+        "accounts_warned_inactive": _count(
+            db,
+            accounts.where(User.inactivity_warned_at.is_not(None), User.inactivity_warned_at >= User.last_seen_at),
+        ),
         "groups": _count(db, select(func.count()).select_from(Group)),
         "memberships_active": _count(
             db, select(func.count()).select_from(Membership).where(Membership.active.is_(True))

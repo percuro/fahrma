@@ -2,7 +2,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app import __version__
-from app.config import get_billing_url, get_operator_links, get_plans, get_registration_mode, mail_enabled
+from app.config import (
+    get_billing_url,
+    get_inactive_delete_months,
+    get_operator_links,
+    get_plans,
+    get_registration_mode,
+    mail_enabled,
+)
 from app.db.database import get_db
 from app.schemas.invitation import MetaRead
 from app.services import push, setup_service
@@ -27,4 +34,5 @@ def meta(db: Session = Depends(get_db)):
         plans=[plan_info(plan) for plan in plans.plans.values()] if plans.configured else None,
         default_plan=plans.default if plans.configured else None,
         billing=get_billing_url() is not None,
+        inactive_delete_months=get_inactive_delete_months(),
     )

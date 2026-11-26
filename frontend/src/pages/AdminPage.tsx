@@ -114,6 +114,7 @@ function Accounts() {
                     !u.is_active && a.inactive,
                     a.groups(u.group_count),
                     u.last_seen_at ? a.lastSeen(f.date(u.last_seen_at)) : a.neverSeen,
+                    u.deletion_due && a.deletionDue(f.date(u.deletion_due)),
                   ].filter(Boolean).join(' · ')}
                 </div>
               </span>
