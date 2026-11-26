@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0-rc.1 – 2026-11-26
 
 Hosting fahrma for others: plans per group, without payment code.
 
