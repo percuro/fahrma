@@ -12,7 +12,7 @@ Receipt photos: a photo of the receipt on fuel entries and expenses, straight fr
 - **Your data:** Group → Data offers all photos as a ZIP, named by date, kind and entry. The JSON export lists them; a group moved to another instance arrives without its photos, and the import says so.
 - `RECEIPTS=off` turns photos off; `RECEIPTS_DIR` and `MAX_RECEIPT_KB` set where they go and how large one may be. See [configuration](docs/configuration.md#receipt-photos).
 - `app.cli.stats` counts receipts and their megabytes.
-- Also in this release: the fix from 0.9.1-rc.1 – date and time fields stay inside their card on iPhone and iPad.
+- Also in this release: the fix from 0.9.1 – date and time fields stay inside their card on iPhone and iPad.
 
 ### Security
 
@@ -29,7 +29,7 @@ Receipt photos: a photo of the receipt on fuel entries and expenses, straight fr
 - The image is based on Python 3.13.17.
 - The roadmap moves: login via OpenID Connect is planned for 0.11.
 
-## 0.9.1-rc.1 – 2026-11-26
+## 0.9.1 – 2026-11-26
 
 - Fixed: on iPhone and iPad, date and time fields stuck out of narrow forms on the right and showed their value centred. They now have the width of the other fields and start on the left; tapping still opens the picker.
 - No migration, no new settings.
