@@ -16,7 +16,7 @@ class IdempotencyKey(Base):
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     key: Mapped[str] = mapped_column(String(64), nullable=False)
-    # trip, fuel, expense or finish (a trip finished)
+    # trip, fuel, expense, finish (a trip finished) or receipt
     kind: Mapped[str] = mapped_column(String(10), nullable=False)
     entity_id: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())

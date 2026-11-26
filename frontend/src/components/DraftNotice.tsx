@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { errorText } from '../lib/api';
 import { draftError, removeDraft, type Draft } from '../lib/outbox';
+import { discardDraftPhotos } from '../lib/photo-outbox';
 import { useGroupId } from '../hooks/useGroupData';
 import { useT } from '../i18n';
 import { useFeedback } from './feedback-context';
@@ -24,6 +25,7 @@ export function DiscardDraftButton({ draft }: { draft: Draft }) {
   const discard = async () => {
     if (!(await confirm(t.offline.confirmDiscard, { confirmLabel: t.offline.discard, danger: true }))) return;
     removeDraft(draft.id);
+    void discardDraftPhotos(draft.id);
     toast(t.offline.discarded);
     navigate(`/g/${gid}`);
   };

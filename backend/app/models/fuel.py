@@ -2,9 +2,10 @@ import datetime as dt
 from datetime import datetime
 
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, String, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
+from app.models.receipt import Receipt
 
 
 class FuelEntry(Base):
@@ -25,3 +26,8 @@ class FuelEntry(Base):
     created_by: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     settlement_id: Mapped[int | None] = mapped_column(ForeignKey("settlements.id"), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+
+    # Loaded with the entry; deleting the entry deletes the rows (the files go after the commit)
+    receipts: Mapped[list[Receipt]] = relationship(
+        Receipt, order_by=Receipt.id, lazy="selectin", cascade="all, delete-orphan", passive_deletes=True
+    )

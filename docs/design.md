@@ -54,7 +54,7 @@ Entering a trip happens in car parks with poor reception and long gaps between u
 
 An underground car park is where trips end. The app starts there anyway: the service worker has the app itself, and the browser keeps what the forms need – the account, the group with its members, the cars and the recent trips. Balances and settlements are never kept on the device; amounts of money always come fresh from the server, and without a connection the overview says so instead of showing an old balance.
 
-A new trip, a fuel receipt, an expense or finishing a running trip that cannot reach the server becomes a draft on the device. Drafts are listed on the overview and sent in the order they were made as soon as the server answers again – when the app starts, comes back online or into view, and every 30 seconds. The next trip already starts at the odometer reading of a drafted one.
+A new trip, a fuel receipt, an expense or finishing a running trip that cannot reach the server becomes a draft on the device; photos of a receipt wait with it. Drafts are listed on the overview and sent in the order they were made as soon as the server answers again – when the app starts, comes back online or into view, and every 30 seconds. The next trip already starts at the odometer reading of a drafted one.
 
 A lost answer must not create a second entry: every draft carries a random key that goes with it as `Idempotency-Key`. The server remembers which entry a key created (per group and person), and a repeated request returns that entry instead of saving it again. If the server refuses a draft – it overlaps a trip someone else entered in the meantime, say – the draft stays with the reason, to be corrected or discarded. Logging out removes drafts and the kept data from the device, after a warning if something has not been sent.
 
@@ -79,6 +79,14 @@ Hosting fahrma for others should not need one instance per customer: a group is 
 A plan is nothing but a name and limits, read from a file the operator writes. fahrma never handles money: the operator sets a group's plan by hand or lets their own billing service do it through a small API with its own token, after a signed hand-off link from the group page. That keeps payment providers, prices, taxes and invoices out of a self-hostable code base, and the same mechanism works for an invoice by hand as for a payment provider.
 
 Plans never hold data hostage. When a plan runs out or gets smaller, the group falls back to the default plan and keeps every car, member, entry and settlement; only adding beyond the limits is refused, and exporting is always possible. A plan's end date is a day in the group's time zone, so an operator's subscription can simply move it on with every payment. The plan does not move with a group's export: it belongs to the instance, and the operator's note about it is never shown to the group.
+
+## Receipt photos
+
+A photo of the receipt settles the question of what a repair cost, so it belongs with the entry, taken right there with the phone camera. Phones take photos of several megabytes; a readable receipt needs a few hundred kilobytes. The app therefore shrinks every photo on the device before sending it – at most 1600 pixels on the longer side, JPEG – which also drops the photo's metadata, such as where it was taken. The server needs no image library: it only checks that a file is the JPEG or WebP it claims to be and serves it with exactly that type and headers that keep a browser from running anything in it. PDFs are left out for now, because they are harder to serve safely.
+
+The photos are files next to the database, not rows in it: the database stays small and quick to back up, and files that never change suit incremental backups. A file is written before its row is committed and removed only after its row is gone; a crash in between leaves at most a file without a row, which a cleanup an hour later removes.
+
+A photo is evidence, not an amount, so it can still be added to a settled entry; removing one is only possible until the entry is settled, like changing it. Without a connection photos wait on the device with the entry's draft – in IndexedDB, since localStorage is far too small – and go after it, each with its own `Idempotency-Key`. Storage is the one limit that grows with use, so it is part of a group's plan, and like every limit it never deletes anything: a full group only cannot add more until it deletes old photos or gets a bigger plan.
 
 ## Accessibility
 

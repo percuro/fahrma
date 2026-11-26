@@ -8,7 +8,7 @@ from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.schemas.entries import ExpenseWrite, FuelWrite, TripWrite
-from app.services import idempotency
+from app.services import idempotency, receipt_store
 from app.services.access import GroupContext
 from app.services.audit_service import record
 from app.services.car_service import get_car
@@ -16,7 +16,7 @@ from app.services.car_service import get_car
 INF = float("inf")
 
 
-def _not_settled(item) -> None:
+def not_settled(item) -> None:
     if item.settlement_id is not None:
         raise AppError(
             status.HTTP_409_CONFLICT,
@@ -113,7 +113,7 @@ def create_trip(ctx: GroupContext, data: TripWrite, key: str | None = None) -> T
 
 def update_trip(ctx: GroupContext, trip_id: int, data: TripWrite) -> Trip:
     trip = get_trip(ctx, trip_id)
-    _not_settled(trip)
+    not_settled(trip)
     _check_km(ctx, data.car_id, data.start_km, data.end_km, trip.id)
     _apply_trip(ctx, trip, data)
     record(ctx, "trip", trip.id, "update", data.model_dump())
@@ -125,7 +125,7 @@ def finish_trip(ctx: GroupContext, trip_id: int, end_km: int, key: str | None = 
     if (earlier := idempotency.previous(ctx, key, "finish")) is not None:
         return idempotency.load(ctx, earlier, get_trip)
     trip = get_trip(ctx, trip_id)
-    _not_settled(trip)
+    not_settled(trip)
     if trip.end_km is not None:
         raise AppError(status.HTTP_409_CONFLICT, "trip_already_finished", "Trip is already finished")
     _check_km(ctx, trip.car_id, trip.start_km, end_km, trip.id)
@@ -136,7 +136,7 @@ def finish_trip(ctx: GroupContext, trip_id: int, end_km: int, key: str | None = 
 
 def delete_trip(ctx: GroupContext, trip_id: int) -> None:
     trip = get_trip(ctx, trip_id)
-    _not_settled(trip)
+    not_settled(trip)
     if ctx.db.query(Expense.id).filter(Expense.trip_id == trip.id).first():
         raise AppError(status.HTTP_409_CONFLICT, "trip_has_expenses", "Expenses are linked to this trip")
     record(ctx, "trip", trip.id, "delete", {"start_km": trip.start_km, "end_km": trip.end_km})
@@ -185,7 +185,7 @@ def create_fuel(ctx: GroupContext, data: FuelWrite, key: str | None = None) -> F
 
 def update_fuel(ctx: GroupContext, fuel_id: int, data: FuelWrite) -> FuelEntry:
     entry = get_fuel(ctx, fuel_id)
-    _not_settled(entry)
+    not_settled(entry)
     _apply_fuel(ctx, entry, data)
     record(ctx, "fuel", entry.id, "update", data.model_dump())
     ctx.db.commit()
@@ -194,8 +194,9 @@ def update_fuel(ctx: GroupContext, fuel_id: int, data: FuelWrite) -> FuelEntry:
 
 def delete_fuel(ctx: GroupContext, fuel_id: int) -> None:
     entry = get_fuel(ctx, fuel_id)
-    _not_settled(entry)
+    not_settled(entry)
     record(ctx, "fuel", entry.id, "delete", {"amount_cents": entry.amount_cents})
+    receipt_store.remove_after_commit(ctx.db, [(r.group_id, r.file) for r in entry.receipts])
     ctx.db.delete(entry)
     ctx.db.commit()
 
@@ -256,7 +257,7 @@ def create_expense(ctx: GroupContext, data: ExpenseWrite, key: str | None = None
 
 def update_expense(ctx: GroupContext, expense_id: int, data: ExpenseWrite) -> Expense:
     entry = get_expense(ctx, expense_id)
-    _not_settled(entry)
+    not_settled(entry)
     _apply_expense(ctx, entry, data)
     record(ctx, "expense", entry.id, "update", data.model_dump())
     ctx.db.commit()
@@ -265,8 +266,9 @@ def update_expense(ctx: GroupContext, expense_id: int, data: ExpenseWrite) -> Ex
 
 def delete_expense(ctx: GroupContext, expense_id: int) -> None:
     entry = get_expense(ctx, expense_id)
-    _not_settled(entry)
+    not_settled(entry)
     record(ctx, "expense", entry.id, "delete", {"amount_cents": entry.amount_cents})
+    receipt_store.remove_after_commit(ctx.db, [(r.group_id, r.file) for r in entry.receipts])
     ctx.db.delete(entry)
     ctx.db.commit()
 

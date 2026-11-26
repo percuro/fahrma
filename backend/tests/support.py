@@ -1,6 +1,8 @@
 """Test environment: in-memory SQLite, fixed clock, TestClients with logged-in users."""
 
+import tempfile
 from datetime import date
+from pathlib import Path
 from unittest import mock
 
 from fastapi.testclient import TestClient
@@ -45,6 +47,10 @@ TEST_ENV = {
     "MAX_GROUPS_PER_USER": "",
     "MAX_MEMBERS_PER_GROUP": "",
     "MAX_CARS_PER_GROUP": "",
+    "MAX_RECEIPT_MB_PER_GROUP": "",
+    # Receipt photos on (the default), stored in a temporary directory per test
+    "RECEIPTS": "",
+    "MAX_RECEIPT_KB": "",
     "PLANS_FILE": "",
     "BILLING_URL": "",
     "OPERATOR_TOKEN": "",
@@ -56,7 +62,9 @@ HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 class ApiTestEnvironment:
     def __init__(self, today: date = date(2026, 11, 24)):
         self.today = today
-        self._env = mock.patch.dict("os.environ", TEST_ENV)
+        self._receipts = tempfile.TemporaryDirectory()
+        self.receipts_dir = Path(self._receipts.name)
+        self._env = mock.patch.dict("os.environ", {**TEST_ENV, "RECEIPTS_DIR": self._receipts.name})
         self._env.start()
         self.engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         configure_sqlite(self.engine)
@@ -102,6 +110,7 @@ class ApiTestEnvironment:
         app.dependency_overrides.clear()
         self.engine.dispose()
         self._env.stop()
+        self._receipts.cleanup()
 
 
 def token_of(url: str) -> str:
@@ -113,3 +122,20 @@ def token_of(url: str) -> str:
 def accept(client: TestClient, url: str, **fields):
     """Use an invitation link; without a session this creates the account given in fields."""
     return client.post("/v1/invites/accept", json={"token": token_of(url), **fields})
+
+
+def jpeg(width: int = 1200, height: int = 1600, size: int = 2000) -> bytes:
+    """A minimal JPEG of about ``size`` bytes: what fahrma checks (markers and frame size), no real picture."""
+    size_bytes = height.to_bytes(2, "big") + width.to_bytes(2, "big")
+    frame = b"\xff\xc0\x00\x11\x08" + size_bytes + b"\x03" + b"\x01\x11\x00" * 3
+    head = b"\xff\xd8" + b"\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+    padding = b""
+    remaining = size - len(head) - len(frame) - 2
+    while remaining > 4:
+        chunk = min(remaining - 4, 65000)
+        padding += b"\xff\xfe" + (chunk + 2).to_bytes(2, "big") + b"x" * chunk
+        remaining -= chunk + 4
+    return head + padding + frame + b"\xff\xd9"
+
+
+JPEG_HEADERS = {"Content-Type": "image/jpeg"}

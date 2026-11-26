@@ -29,7 +29,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<{ data: T; response: Response }> {
   const headers = new Headers(init?.headers);
   headers.set('X-Carshare-CSRF', '1');
-  if (init?.body && !(init.body instanceof FormData) && !headers.has('Content-Type')) {
+  if (init?.body && !(init.body instanceof FormData) && !(init.body instanceof Blob) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   const response = await fetch(apiUrl(path), {

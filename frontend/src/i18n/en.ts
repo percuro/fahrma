@@ -162,6 +162,10 @@ export const en: Messages = {
     submit: 'Move here',
     importing: 'Moving …',
     done: 'Group moved here',
+    receiptsLeft: (n: number) =>
+      n === 1
+        ? 'One receipt photo stays on the old instance; download it there under Group → Data as a ZIP.'
+        : `${n} receipt photos stay on the old instance; download them there under Group → Data as a ZIP.`,
   },
   dashboard: {
     noCar: 'No car yet.',
@@ -393,9 +397,10 @@ export const en: Messages = {
     addCar: '+ Car',
     plan: 'Plan',
     planUntil: (date: string) => `valid until ${date}`,
-    planUsage: (used: number, max: number | null) => (max === null ? `${used}` : `${used} of ${max}`),
+    planUsage: (used: number | string, max: number | string | null) => (max === null ? `${used}` : `${used} of ${max}`),
     planMembers: 'Members',
     planCars: 'Cars',
+    planReceipts: 'Storage for receipts',
     planUnlimited: 'unlimited',
     planFull: 'full',
     planHint: 'Retired cars and people who left do not count.',
@@ -413,6 +418,8 @@ export const en: Messages = {
     csv: 'All entries as CSV',
     json: 'Complete as JSON',
     jsonHint: 'With all settlements and the change log – for your archive or for moving to another instance.',
+    receiptsZip: 'Receipt photos as ZIP',
+    receiptsZipHint: 'The photos are not in the JSON file and do not move along to another instance – download them here first.',
     deleteTitle: 'Delete group',
     deleteIntro: 'Deletes the group with all cars, trips, costs and settlements – for every member. Export the data first.',
     deleteConfirmName: (name: string) => `Type the name to confirm: ${name}`,
@@ -672,6 +679,9 @@ export const en: Messages = {
     email_required: () => 'Please enter your e-mail address.',
     no_email: () => 'This account has no confirmed e-mail address.',
     limit_reached: (p: Params) => {
+      if (p.limit === 'receipt_mb_per_group') {
+        return `The storage for receipts is full (${s(p.max)} MB${p.plan ? ' in the group’s plan' : ''}). Delete old photos${p.plan ? ' or ask the group’s admins to change the plan' : ''}.`;
+      }
       const what: Record<string, string> = {
         groups_per_user: 'groups per person',
         members_per_group: 'members per group',
@@ -682,6 +692,12 @@ export const en: Messages = {
       }
       return `Limit reached: at most ${s(p.max)} ${what[s(p.limit)] ?? ''} on this instance.`.replace(/ {2,}/g, ' ');
     },
+    receipt_too_large: (p: Params) => `The photo is too large (at most ${s(p.max_kb)} KB).`,
+    receipt_invalid: () => 'This is not a readable image.',
+    receipt_type: () => 'Only JPEG or WebP photos.',
+    receipt_count: (p: Params) => `At most ${s(p.max)} photos per entry.`,
+    receipt_not_found: () => 'Photo not found.',
+    receipts_off: () => 'Receipt photos are turned off on this instance.',
     plan_unknown: (p: Params) => `There is no plan “${s(p.plan)}” on this instance.`,
     billing_disabled: () => 'Plans cannot be changed in the app on this instance.',
   },
@@ -760,6 +776,33 @@ export const en: Messages = {
       person: 'Please choose who it is for.',
       endBeforeStart: 'The end must be after the start.',
     },
+  },
+  receipts: {
+    title: 'Receipts',
+    take: 'Take photo',
+    choose: 'Choose from photos',
+    photo: (n: number) => `Receipt ${n}`,
+    show: (label: string) => `Show ${label}`,
+    remove: (label: string) => `Remove ${label}`,
+    open: 'Open original',
+    close: 'Close',
+    confirmDelete: 'Delete this photo?',
+    deleted: 'Photo deleted',
+    preparing: (n: number, of: number) => (of === 1 ? 'Shrinking the photo …' : `Shrinking photo ${n} of ${of} …`),
+    sending: 'Sending …',
+    waiting: 'Photo kept on this device – it is sent as soon as there is a connection',
+    unreadable: 'This image cannot be read. Please choose a JPEG, PNG or HEIC photo.',
+    tooMany: (max: number) => `At most ${max} photos per entry – the others were left out.`,
+    full: (max: number) => `${max} photos – no more fit one entry.`,
+    notKept: 'The photo could not be sent, and this device cannot keep it for later.',
+    offlineUnavailable: 'Without a connection, this device cannot keep photos for later.',
+    listed: 'with receipt',
+    saved: {
+      'photos-waiting': 'Saved – the photos are sent as soon as there is a connection',
+      'photos-refused': 'Saved, but without the photo',
+      'photos-lost': 'Saved, but without the photo: this device cannot keep photos for later',
+    } as Record<string, string>,
+    refused: (reason: string) => `Entry saved, but not the photo: ${reason}`,
   },
   offline: {
     banner: 'Offline – new entries stay on this device and are sent automatically later.',

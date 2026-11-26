@@ -75,6 +75,7 @@ export function ImportPage() {
                   preview.exported_at && i.exported(f.date(preview.exported_at)),
                 ].filter(Boolean).join(' · ')}
               </p>
+              {(preview.counts.receipts ?? 0) > 0 && <p className="notice mt-05">{i.receiptsLeft(preview.counts.receipts ?? 0)}</p>}
             </div>
             <fieldset>
               <legend>{i.whoAreYou}</legend>

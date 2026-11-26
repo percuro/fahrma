@@ -5,6 +5,7 @@ import { useFormat } from '../hooks/useFormat';
 import { useT } from '../i18n';
 import { queryState } from '../components/queryState';
 import { TripRow } from './DashboardPage';
+import { ReceiptIcon } from '../components/Icons';
 
 const TABS = ['trips', 'fuel', 'expenses'] as const;
 type Tab = (typeof TABS)[number];
@@ -75,6 +76,18 @@ function TripList() {
   );
 }
 
+/** A small receipt symbol on entries with photos; the word is there for screen readers. */
+function HasReceipt({ count }: { count: number }) {
+  const t = useT();
+  if (count === 0) return null;
+  return (
+    <span className="receipt-mark" title={t.receipts.listed}>
+      <ReceiptIcon />
+      <span className="sr-only">{t.receipts.listed}</span>
+    </span>
+  );
+}
+
 function FuelList() {
   const t = useT();
   const f = useFormat();
@@ -104,6 +117,7 @@ function FuelList() {
                 <div className="meta">{meta.join(' · ')}</div>
               </span>
               <span className="num">{f.money(entry.amount_cents)}</span>
+              <HasReceipt count={entry.receipts?.length ?? 0} />
               {entry.settlement_id !== null && <span className="badge">{t.common.settled}</span>}
             </Link>
           </li>
@@ -139,6 +153,7 @@ function ExpenseList() {
               </div>
             </span>
             <span className="num">{f.money(e.amount_cents)}</span>
+            <HasReceipt count={e.receipts?.length ?? 0} />
             {e.settlement_id !== null && <span className="badge">{t.common.settled}</span>}
           </Link>
         </li>

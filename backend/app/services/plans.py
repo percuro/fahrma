@@ -18,6 +18,7 @@ from app.errors import AppError
 from app.models.audit import AuditEntry
 from app.models.car import Car
 from app.models.group import ROLE_ADMIN, Group, Membership
+from app.models.receipt import Receipt
 from app.models.user import User
 
 
@@ -41,13 +42,25 @@ def effective_plan(group: Group, today: date | None = None) -> Plan:
     return settings.default_plan
 
 
-def usage(db: Session, group_id: int) -> dict[str, int]:
-    """What counts against the limits: active members (also without an account), cars not archived."""
+MEGABYTE = 1024 * 1024
+
+
+def receipt_bytes(db: Session, group_id: int) -> int:
+    return db.scalar(select(func.coalesce(func.sum(Receipt.bytes), 0)).where(Receipt.group_id == group_id)) or 0
+
+
+def usage(db: Session, group_id: int) -> dict[str, int | float]:
+    """What counts against the limits: active members (also without an account), cars not
+    archived, and the receipt photos in megabytes (one decimal)."""
     members = db.scalar(
         select(func.count()).select_from(Membership).where(Membership.group_id == group_id, Membership.active.is_(True))
     )
     cars = db.scalar(select(func.count()).select_from(Car).where(Car.group_id == group_id, Car.archived.is_(False)))
-    return {"members_per_group": members or 0, "cars_per_group": cars or 0}
+    return {
+        "members_per_group": members or 0,
+        "cars_per_group": cars or 0,
+        "receipt_mb_per_group": round(receipt_bytes(db, group_id) / MEGABYTE, 1),
+    }
 
 
 def plan_info(plan: Plan) -> dict:
@@ -56,6 +69,7 @@ def plan_info(plan: Plan) -> dict:
         "name": plan.name,
         "members_per_group": plan.members_per_group,
         "cars_per_group": plan.cars_per_group,
+        "receipt_mb_per_group": plan.receipt_mb_per_group,
     }
 
 

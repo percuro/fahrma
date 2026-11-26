@@ -13,11 +13,13 @@ from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
+from app.models.receipt import Receipt
 from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import User
 from app.schemas.group import GroupUpdate
+from app.services import receipt_store
 from app.services.access import GroupContext
 from app.services.audit_service import record
 from app.services.auth_service import AuthService, utcnow
@@ -241,6 +243,8 @@ def delete_group_data(db: Session, group_id: int) -> None:
     trip_ids = select(Trip.id).where(Trip.group_id == group_id)
     settlement_ids = select(Settlement.id).where(Settlement.group_id == group_id)
     member_ids = list(db.scalars(select(Membership.user_id).where(Membership.group_id == group_id)))
+    db.execute(delete(Receipt).where(Receipt.group_id == group_id))
+    receipt_store.remove_after_commit(db, group_id=group_id)
     db.execute(delete(Expense).where(Expense.group_id == group_id))
     db.execute(delete(FuelEntry).where(FuelEntry.group_id == group_id))
     db.execute(delete(TripShare).where(TripShare.trip_id.in_(trip_ids)))

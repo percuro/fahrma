@@ -9,7 +9,7 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 ## Features
 
 - **Trips in seconds:** start km is prefilled with the car's last reading. Start a trip now and finish it later, or enter it afterwards. Share a trip equally or by weights (2:1), and record money from passengers outside the group.
-- **Fuel, charging and other costs:** fuel receipts with litres, charging with kWh, price per unit; insurance, tax, service, tyres, parking, toll and more, split by km, equally, to one person or like a specific trip.
+- **Fuel, charging and other costs:** fuel receipts with litres, charging with kWh, price per unit, and a photo of the receipt straight from the phone camera; insurance, tax, service, tyres, parking, toll and more, split by km, equally, to one person or like a specific trip.
 - **Fair rate per km** per car and period, calculated from the actual fuel costs. Fuel without driven km carries over to the next period.
 - **Works in the underground car park:** without a connection, entries are kept on the phone as drafts and sent automatically later – never twice. The app also starts offline.
 - **Reservation calendar:** see who has which car when, reserve it for yourself or someone else; clashes are refused with the name of whoever has it.
@@ -53,8 +53,8 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 ## Roadmap
 
-- **0.10** login via OpenID Connect
-- **0.11** receipt photos (with storage per plan), beta hardening; **1.0** stable API and configuration
+- **0.11** login via OpenID Connect
+- **0.12** beta hardening; **1.0** stable API and configuration
 
 ## Sibling project
 

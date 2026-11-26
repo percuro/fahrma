@@ -6,6 +6,7 @@ from app.models.group import Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
 from app.models.push import InstanceKey, PushSubscription, SentNotification
+from app.models.receipt import Receipt
 from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
@@ -23,6 +24,7 @@ __all__ = [
     "Invite",
     "Membership",
     "PushSubscription",
+    "Receipt",
     "Reservation",
     "SentNotification",
     "Settlement",

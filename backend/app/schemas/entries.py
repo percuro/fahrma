@@ -2,6 +2,8 @@ import datetime as dt
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.schemas.receipts import ReceiptRead
+
 MAX_CENTS = 10_000_000  # 100,000 in the group's currency
 MAX_KM = 5_000_000
 
@@ -82,6 +84,7 @@ class FuelRead(FuelWrite):
     id: int
     created_by: int
     settlement_id: int | None
+    receipts: list[ReceiptRead] = []
 
 
 class ExpenseWrite(BaseModel):
@@ -100,3 +103,4 @@ class ExpenseRead(ExpenseWrite):
     id: int
     created_by: int
     settlement_id: int | None
+    receipts: list[ReceiptRead] = []

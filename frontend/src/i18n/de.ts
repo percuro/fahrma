@@ -168,6 +168,10 @@ export const de = {
     submit: 'Übernehmen',
     importing: 'Wird übernommen …',
     done: 'Fahrgemeinschaft übernommen',
+    receiptsLeft: (n: number) =>
+      n === 1
+        ? 'Ein Belegfoto bleibt auf der alten Instanz; lade es dort unter Gruppe → Daten als ZIP herunter.'
+        : `${n} Belegfotos bleiben auf der alten Instanz; lade sie dort unter Gruppe → Daten als ZIP herunter.`,
   },
   dashboard: {
     noCar: 'Noch kein Auto angelegt.',
@@ -400,9 +404,10 @@ export const de = {
     addCar: '+ Auto',
     plan: 'Tarif',
     planUntil: (date: string) => `gültig bis ${date}`,
-    planUsage: (used: number, max: number | null) => (max === null ? `${used}` : `${used} von ${max}`),
+    planUsage: (used: number | string, max: number | string | null) => (max === null ? `${used}` : `${used} von ${max}`),
     planMembers: 'Mitglieder',
     planCars: 'Autos',
+    planReceipts: 'Speicher für Belege',
     planUnlimited: 'unbegrenzt',
     planFull: 'voll',
     planHint: 'Stillgelegte Autos und ausgetretene Personen zählen nicht.',
@@ -420,6 +425,8 @@ export const de = {
     csv: 'Alle Einträge als CSV',
     json: 'Vollständig als JSON',
     jsonHint: 'Mit allen Abrechnungen und dem Änderungsprotokoll – für Archiv oder Umzug auf eine andere Instanz.',
+    receiptsZip: 'Belegfotos als ZIP',
+    receiptsZipHint: 'Die Fotos sind nicht in der JSON-Datei und ziehen bei einem Umzug nicht mit – lade sie vorher hier herunter.',
     deleteTitle: 'Gruppe löschen',
     deleteIntro: 'Löscht die Gruppe mit allen Autos, Fahrten, Kosten und Abrechnungen – für alle Mitglieder. Exportiere vorher die Daten.',
     deleteConfirmName: (name: string) => `Zur Bestätigung den Namen eingeben: ${name}`,
@@ -681,6 +688,9 @@ export const de = {
     email_required: () => 'Bitte gib deine E-Mail-Adresse an.',
     no_email: () => 'Dieser Zugang hat keine bestätigte E-Mail-Adresse.',
     limit_reached: (p: Params) => {
+      if (p.limit === 'receipt_mb_per_group') {
+        return `Der Speicher für Belege ist voll (${s(p.max)} MB${p.plan ? ' im Tarif der Gruppe' : ''}). Lösche alte Fotos${p.plan ? ' oder lass die Admins der Gruppe den Tarif ändern' : ''}.`;
+      }
       const what: Record<string, string> = {
         groups_per_user: 'Fahrgemeinschaften pro Person',
         members_per_group: 'Mitglieder pro Fahrgemeinschaft',
@@ -691,6 +701,12 @@ export const de = {
       }
       return `Grenze erreicht: höchstens ${s(p.max)} ${what[s(p.limit)] ?? ''} auf dieser Instanz.`.replace(/ {2,}/g, ' ');
     },
+    receipt_too_large: (p: Params) => `Das Foto ist zu groß (höchstens ${s(p.max_kb)} KB).`,
+    receipt_invalid: () => 'Das ist kein lesbares Bild.',
+    receipt_type: () => 'Nur Fotos im Format JPEG oder WebP.',
+    receipt_count: (p: Params) => `Höchstens ${s(p.max)} Fotos pro Eintrag.`,
+    receipt_not_found: () => 'Foto nicht gefunden.',
+    receipts_off: () => 'Auf dieser Instanz sind Belegfotos ausgeschaltet.',
     plan_unknown: (p: Params) => `Einen Tarif „${s(p.plan)}“ gibt es auf dieser Instanz nicht.`,
     billing_disabled: () => 'Auf dieser Instanz lässt sich der Tarif nicht in der App ändern.',
   } as Record<string, (p: Params) => string>,
@@ -769,6 +785,33 @@ export const de = {
       person: 'Bitte wählen, für wen.',
       endBeforeStart: 'Das Ende muss nach dem Beginn liegen.',
     },
+  },
+  receipts: {
+    title: 'Belege',
+    take: 'Foto aufnehmen',
+    choose: 'Aus Fotos wählen',
+    photo: (n: number) => `Beleg ${n}`,
+    show: (label: string) => `${label} ansehen`,
+    remove: (label: string) => `${label} entfernen`,
+    open: 'Original öffnen',
+    close: 'Schließen',
+    confirmDelete: 'Dieses Foto löschen?',
+    deleted: 'Foto gelöscht',
+    preparing: (n: number, of: number) => (of === 1 ? 'Foto wird verkleinert …' : `Foto ${n} von ${of} wird verkleinert …`),
+    sending: 'Wird gesendet …',
+    waiting: 'Foto auf diesem Gerät gespeichert – wird gesendet, sobald es Verbindung gibt',
+    unreadable: 'Dieses Bild lässt sich nicht lesen. Bitte ein Foto im Format JPEG, PNG oder HEIC wählen.',
+    tooMany: (max: number) => `Höchstens ${max} Fotos pro Eintrag – die übrigen wurden nicht übernommen.`,
+    full: (max: number) => `${max} Fotos – mehr passen nicht zu einem Eintrag.`,
+    notKept: 'Das Foto konnte nicht gesendet werden und lässt sich auf diesem Gerät nicht zwischenspeichern.',
+    offlineUnavailable: 'Ohne Verbindung kann dieses Gerät keine Fotos zwischenspeichern.',
+    listed: 'mit Beleg',
+    saved: {
+      'photos-waiting': 'Gespeichert – die Fotos werden gesendet, sobald es Verbindung gibt',
+      'photos-refused': 'Gespeichert, aber ohne Foto',
+      'photos-lost': 'Gespeichert, aber ohne Foto: dieses Gerät kann Fotos nicht zwischenspeichern',
+    } as Record<string, string>,
+    refused: (reason: string) => `Eintrag gespeichert, das Foto aber nicht: ${reason}`,
   },
   offline: {
     banner: 'Offline – neue Einträge bleiben auf diesem Gerät und gehen später automatisch raus.',

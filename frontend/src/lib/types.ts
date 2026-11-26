@@ -54,11 +54,15 @@ export interface PlanInfo {
   /** null = unlimited */
   members_per_group: number | null;
   cars_per_group: number | null;
+  /** Megabytes of receipt photos; since 0.10 */
+  receipt_mb_per_group?: number | null;
 }
 
 export interface PlanUsage {
   members_per_group: number;
   cars_per_group: number;
+  /** Megabytes, one decimal; since 0.10 */
+  receipt_mb_per_group?: number;
 }
 
 /** The plan in force for a group. */
@@ -131,10 +135,23 @@ export interface FuelWrite {
   note: string | null;
 }
 
+/** A receipt photo; the image is at /groups/{group}/receipts/{id}. */
+export interface Receipt {
+  id: number;
+  content_type: string;
+  bytes: number;
+  width: number;
+  height: number;
+  created_by: number;
+  created_at: string;
+}
+
 export interface Fuel extends FuelWrite {
   id: number;
   created_by: number;
   settlement_id: number | null;
+  /** Since 0.10; missing in data a device kept from an older version */
+  receipts?: Receipt[];
 }
 
 export type Allocation = 'by_km' | 'equal' | 'single' | 'trip';
@@ -155,6 +172,8 @@ export interface Expense extends ExpenseWrite {
   id: number;
   created_by: number;
   settlement_id: number | null;
+  /** Since 0.10; missing in data a device kept from an older version */
+  receipts?: Receipt[];
 }
 
 export interface BalanceWarning {
@@ -246,7 +265,12 @@ export interface Meta {
   registration: 'invite' | 'open';
   setup_needed: boolean;
   links: { imprint_url: string | null; privacy_url: string | null; terms_url: string | null };
-  limits: { groups_per_user: number | null; members_per_group: number | null; cars_per_group: number | null };
+  limits: {
+    groups_per_user: number | null;
+    members_per_group: number | null;
+    cars_per_group: number | null;
+    receipt_mb_per_group?: number | null;
+  };
   /** E-mail is set up: forgotten password, addresses, links by mail */
   mail: boolean;
   /** Web Push: the key for subscribing; null = push notifications are off on this instance */
@@ -259,6 +283,8 @@ export interface Meta {
   billing?: boolean;
   /** Accounts unused for this many months are deleted after a warning; null = never */
   inactive_delete_months?: number | null;
+  /** Receipt photos can be attached (since 0.10; missing = off) */
+  receipts?: boolean;
 }
 
 export interface DeviceSession {
@@ -355,7 +381,7 @@ export interface ImportPreview {
   currency: string;
   timezone: string | null;
   members: { user_id: number; display_name: string; role: 'admin' | 'member'; active: boolean; deleted: boolean }[];
-  counts: { cars: number; trips: number; fuel: number; expenses: number; settlements: number };
+  counts: { cars: number; trips: number; fuel: number; expenses: number; settlements: number; receipts?: number };
   first_date: string | null;
   last_date: string | null;
 }

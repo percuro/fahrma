@@ -32,11 +32,15 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `MAX_GROUPS_PER_USER` | unlimited | Active group memberships per account (creating and joining). Empty or `0` = unlimited. |
 | `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group (also people without an account). Not together with `PLANS_FILE`: there, each plan has its own. |
 | `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. Not together with `PLANS_FILE`. |
-| `PLANS_FILE` | – | JSON file with the plans a group can have, each with its own limits; see [Plans](#plans). Unset: every group has the limits of `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP`. |
+| `MAX_RECEIPT_MB_PER_GROUP` | unlimited | Megabytes of receipt photos per group. Not together with `PLANS_FILE`. |
+| `PLANS_FILE` | – | JSON file with the plans a group can have, each with its own limits; see [Plans](#plans). Unset: every group has the limits of `MAX_MEMBERS_PER_GROUP`, `MAX_CARS_PER_GROUP` and `MAX_RECEIPT_MB_PER_GROUP`. |
 | `BILLING_URL` | – | Page where group admins change their group's plan (pricing page, contact form or your billing service); the group page then shows *Change plan*. See [Plans](#plans). |
 | `OPERATOR_TOKEN` | – | Turns on the [operator API](operator-api.md) for your own tools, e.g. a billing service; at least 32 characters (`openssl rand -hex 32`). Also signs the billing links. |
 | `OPERATOR_TOKEN_FILE` | – | Read the token from a file instead (e.g. a Docker secret); wins over `OPERATOR_TOKEN`. |
 | `INACTIVE_DELETE_MONTHS` | – (never) | Delete accounts that have not been used for this many months (at least 3), after a warning; see [Deleting unused accounts](#deleting-unused-accounts). |
+| `RECEIPTS` | on | Photos of receipts on fuel entries and expenses; `off` switches them off. See [Receipt photos](#receipt-photos). |
+| `RECEIPTS_DIR` | `receipts` next to the database (`/data/receipts`) | Where the photos are stored. Required with a database that is not a SQLite file. |
+| `MAX_RECEIPT_KB` | `3072` | Largest photo accepted, in KB (at least 100). The app shrinks photos to a few hundred KB before sending. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 | `API_DOCS` | `false` | `true` serves the OpenAPI documentation at `/api/docs`. Meant for development. |
 | `FRONTEND_DIST` | `/app/frontend` in the image | Directory with the built frontend. Unset: API only (development with Vite). |
@@ -76,8 +80,8 @@ For hosting fahrma for others, each group can have a plan with its own limits �
 {
   "default": "free",
   "plans": [
-    { "id": "free", "name": { "de": "Gratis", "en": "Free" }, "members_per_group": 5, "cars_per_group": 1 },
-    { "id": "plus", "name": "Plus", "members_per_group": 25, "cars_per_group": 5 },
+    { "id": "free", "name": { "de": "Gratis", "en": "Free" }, "members_per_group": 5, "cars_per_group": 1, "receipt_mb_per_group": 50 },
+    { "id": "plus", "name": "Plus", "members_per_group": 25, "cars_per_group": 5, "receipt_mb_per_group": 1000 },
     { "id": "club", "name": { "de": "Verein", "en": "Club" } }
   ]
 }
@@ -85,14 +89,26 @@ For hosting fahrma for others, each group can have a plan with its own limits �
 
 - `id`: 1–32 characters `a-z`, `0-9`, `-`, `_`; stored with the group, so do not rename it once in use.
 - `name`: one text, or one per language; shown to the group's members.
-- `members_per_group`, `cars_per_group`: missing, `null` or `0` = unlimited.
+- `members_per_group`, `cars_per_group`, `receipt_mb_per_group` (megabytes of receipt photos): missing, `null` or `0` = unlimited.
 - `default`: the plan of every group without its own – new groups, imported groups, groups whose plan ran out or was removed from the file.
 
-A group's plan can have a last day (*valid until*, in the group's time zone); afterwards the default plan applies again. **Nothing is ever locked or deleted** when a plan ends or gets smaller: the group keeps every car, member and entry and works as before; only adding cars or members beyond the limits of the plan now in force is refused, with a message that names the plan. A group moved in from another instance has to fit the default plan.
+A group's plan can have a last day (*valid until*, in the group's time zone); afterwards the default plan applies again. **Nothing is ever locked or deleted** when a plan ends or gets smaller: the group keeps every car, member and entry and works as before; only adding cars, members or photos beyond the limits of the plan now in force is refused, with a message that names the plan. A group moved in from another instance has to fit the default plan.
 
 Changes to the file take effect without a restart. An invalid file stops the start with a message; if it becomes invalid while running, the plans read before stay in force and the error is logged. Plans and their limits are public (`/api/v1/meta`), so the app can show them.
 
 With `BILLING_URL`, group admins see *Change plan* on the group page. It opens `BILLING_URL#group=<id>&plan=<current plan>` – and, with `OPERATOR_TOKEN`, `&token=<signed token>` that your billing service can check through the operator API, see [operator-api.md](operator-api.md#billing-links). The part after `#` never reaches access logs.
+
+## Receipt photos
+
+Members can attach up to five photos to each fuel entry and expense – the receipt, or the pages of a garage invoice. The app shrinks each photo on the phone to at most 1600 pixels on the longer side (a few hundred KB) and drops its metadata, such as where it was taken, before it is sent. Photos can be added to settled entries too; deleting them is only possible until the entry is settled, like changing it.
+
+- The photos are files in `RECEIPTS_DIR` (`/data/receipts` in the container, on the same volume as the database), one directory per group. **Back them up with the database**: the SQL dump does not contain them, see [backup](self-hosting.md#backup-and-restore).
+- They are only accepted as JPEG or WebP and only served to members of the group, with headers that keep a browser from running anything in them.
+- Group → Data offers all photos of a group as a ZIP. The JSON export lists them, but a group moved to another instance arrives without its photos.
+- Deleting an entry, a group or an account that takes its groups along removes the photos; leftovers of an interrupted upload are removed after an hour.
+- With plans, `receipt_mb_per_group` limits the storage per group; the group page shows how much is used.
+
+`RECEIPTS=off` hides them in the app and refuses new ones; photos already stored stay on disk until switched on again or deleted with their group.
 
 ## Deleting unused accounts
 
