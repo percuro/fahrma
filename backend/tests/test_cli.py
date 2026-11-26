@@ -37,6 +37,7 @@ class CliTests(GroupSetupMixin, unittest.TestCase):
         finally:
             db.close()
         self.assertEqual((data["accounts"], data["admins"], data["groups"], data["trips"]), (2, 1, 1, 1))
+        self.assertEqual(data["groups_per_plan"], {"default": 1})
         self.assertNotIn("Test group", repr(data))
 
 

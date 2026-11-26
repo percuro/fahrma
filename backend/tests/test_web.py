@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from fastapi.testclient import TestClient
 
@@ -58,6 +59,17 @@ class WebTest(unittest.TestCase):
         response = bare.post("/api/v1/groups", json={"name": "x"})
         self.assertEqual(response.status_code, 403)
         self.assertEqual(response.json()["detail"]["code"], "csrf_rejected")
+
+    def test_mounted_operator_api_needs_no_csrf_header(self):
+        token = "o" * 40
+        with mock.patch.dict("os.environ", {"OPERATOR_TOKEN": token}):
+            bare = TestClient(self.client.app, headers={"Authorization": f"Bearer {token}"})
+            # Reaches the operator API (no group 999) instead of being stopped by the CSRF check
+            response = bare.put("/api/v1/operator/groups/999/plan", json={"plan": None})
+            self.assertEqual(response.json()["detail"]["code"], "group_not_found")
+            # Paths that merely contain the prefix are still checked
+            response = bare.post("/api/v1/groups/v1/operator/x", json={})
+            self.assertEqual(response.json()["detail"]["code"], "csrf_rejected")
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from app.models.group import Group, Membership
 from app.models.trip import Trip
 from app.models.user import User
 from app.services.auth_service import utcnow
+from app.services.plans import effective_plan
 
 
 def _count(db: Session, query) -> int:
@@ -34,6 +35,10 @@ def collect(db: Session) -> dict:
             select(month, func.count()).where(model.created_at >= now - timedelta(days=366)).group_by(month)
         ):
             months[key] = months.get(key, 0) + count
+    plans: dict[str, int] = {}
+    for group in db.scalars(select(Group)):
+        plan = effective_plan(group).id
+        plans[plan] = plans.get(plan, 0) + 1
     return {
         "accounts": _count(db, accounts),
         "accounts_active": _count(db, accounts.where(User.is_active.is_(True))),
@@ -50,6 +55,8 @@ def collect(db: Session) -> dict:
         "fuel_entries": _count(db, select(func.count()).select_from(FuelEntry)),
         "expenses": _count(db, select(func.count()).select_from(Expense)),
         "entries_per_month": dict(sorted(months.items())),
+        # Plan in force per group (one implicit plan "default" without PLANS_FILE)
+        "groups_per_plan": dict(sorted(plans.items())),
     }
 
 
@@ -68,8 +75,8 @@ def main() -> None:
     for key, value in data.items():
         if isinstance(value, dict):
             print(f"{key}:")
-            for month, count in value.items():
-                print(f"  {month}  {count}")
+            for name, count in value.items():
+                print(f"  {name}  {count}")
         else:
             print(f"{key:<24} {value}")
 

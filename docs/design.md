@@ -28,7 +28,7 @@ The interface is German and English; each person picks a language or follows the
 
 ## Deleting without breaking the books
 
-A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. Instance admins manage accounts, never contents: the administration page shows names, roles and activity, but no groups' trips or amounts.
+A group's balances depend on every trip and payment of every member. Deleting an account therefore removes what identifies the person – login, devices, username, display name, also in frozen settlements – but keeps their bookings under an anonymous name. The others' balances and earlier settlements stay exactly as they were. Instance admins manage accounts and plans, never contents: the administration page shows names, roles, activity and each group's plan and size, but no groups' trips or amounts.
 
 ## People without an account
 
@@ -71,6 +71,14 @@ The person a reservation is for, whoever entered it and the group admins can cha
 A reminder is what makes a reservation useful: an hour before, the phone says the car is yours. Web Push delivers that to installed web apps on Android, desktops and, since iOS 16.4, iPhones, so it needs no native app either. The instance signs its messages with its own key (VAPID) and encrypts each one for the device, so neither an account with Google or Apple nor any configuration is needed, and the push services only pass on what they cannot read.
 
 A subscription belongs to a login on a device: logging out ends it, and whoever logs in next on that browser does not receive someone else's reminders. Every kind of notification can be switched off, and none contains an amount of money. The server only sends to the known push services of the browsers, so a client cannot make it call an arbitrary address. Reminders come from a small loop inside the app that looks once a minute; what went out is remembered, so a restart repeats nothing. With exactly one instance there is nothing to coordinate.
+
+## Plans without payment code
+
+Hosting fahrma for others should not need one instance per customer: a group is already a closed world, so one instance with many groups is the cheapest and simplest to run, and a person can be in several groups with one account. The group is therefore also what has a plan – the people sharing a car share its cost, too.
+
+A plan is nothing but a name and limits, read from a file the operator writes. fahrma never handles money: the operator sets a group's plan by hand or lets their own billing service do it through a small API with its own token, after a signed hand-off link from the group page. That keeps payment providers, prices, taxes and invoices out of a self-hostable code base, and the same mechanism works for an invoice by hand as for a payment provider.
+
+Plans never hold data hostage. When a plan runs out or gets smaller, the group falls back to the default plan and keeps every car, member, entry and settlement; only adding beyond the limits is refused, and exporting is always possible. A plan's end date is a day in the group's time zone, so an operator's subscription can simply move it on with every payment. The plan does not move with a group's export: it belongs to the instance, and the operator's note about it is never shown to the group.
 
 ## Accessibility
 

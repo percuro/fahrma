@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from app.schemas.auth import Email
+from app.schemas.plans import GroupPlanRead
 
 
 class GroupCreate(BaseModel):
@@ -57,6 +58,7 @@ class GroupRead(BaseModel):
     today: str
     my_role: str
     members: list[MemberRead]
+    plan: GroupPlanRead
 
 
 class GroupDelete(BaseModel):

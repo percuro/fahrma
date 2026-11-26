@@ -398,6 +398,17 @@ export const de = {
     archived: 'stillgelegt',
     noCars: 'Noch kein Auto.',
     addCar: '+ Auto',
+    plan: 'Tarif',
+    planUntil: (date: string) => `gültig bis ${date}`,
+    planUsage: (used: number, max: number | null) => (max === null ? `${used}` : `${used} von ${max}`),
+    planMembers: 'Mitglieder',
+    planCars: 'Autos',
+    planUnlimited: 'unbegrenzt',
+    planFull: 'voll',
+    planHint: 'Stillgelegte Autos und ausgetretene Personen zählen nicht.',
+    planChange: 'Tarif ändern',
+    planChangeHint: 'Öffnet die Seite des Betreibers zu den Tarifen.',
+    planAdminsOnly: 'Den Tarif ändern die Admins der Gruppe.',
     settings: 'Einstellungen der Gruppe',
     rename: 'Name der Fahrgemeinschaft',
     currency: 'Währung',
@@ -553,6 +564,21 @@ export const de = {
     sentTo: (email: string) => `An ${email} geschickt.`,
     resetByMail: 'Link per E-Mail',
     resetSent: (name: string, email: string) => `Link für @${name} an ${email} geschickt – gilt 24 Stunden, einmal:`,
+    groupsTitle: 'Gruppen',
+    groupsHint: 'Tarif, Größe und Admins jeder Gruppe – keine Fahrten, keine Beträge.',
+    noGroups: 'Noch keine Gruppen.',
+    groupSize: (members: number, cars: number) =>
+      `${members === 1 ? '1 Mitglied' : `${members} Mitglieder`} · ${cars === 1 ? '1 Auto' : `${cars} Autos`}`,
+    groupAdmins: (names: string) => `Admins: ${names}`,
+    lastActivity: (date: string) => `zuletzt geändert ${date}`,
+    plan: 'Tarif',
+    planDefault: (name: string) => `Standard (${name})`,
+    planUntil: 'Gültig bis (letzter Tag)',
+    planUntilHint: 'Leer: bis zur nächsten Änderung. Danach gilt der Standardtarif; gelöscht wird nichts.',
+    planNote: 'Notiz (nur hier sichtbar, z. B. Rechnungsnummer)',
+    planExpired: (name: string, date: string) => `${name} ist am ${date} ausgelaufen`,
+    planUnknown: (id: string) => `${id} (nicht mehr in der Tarif-Datei)`,
+    planEdit: 'Tarif ändern',
   },
   errors: {
     csrf_rejected: () => 'Ungültige Anfrageherkunft. Bitte die Seite neu laden.',
@@ -654,8 +680,13 @@ export const de = {
         members_per_group: 'Mitglieder pro Fahrgemeinschaft',
         cars_per_group: 'Autos pro Fahrgemeinschaft',
       };
+      if (p.plan) {
+        return `Der Tarif der Gruppe erlaubt höchstens ${s(p.max)} ${what[s(p.limit)] ?? ''}. Die Admins der Gruppe können den Tarif auf der Gruppenseite ändern.`.replace(/ {2,}/g, ' ');
+      }
       return `Grenze erreicht: höchstens ${s(p.max)} ${what[s(p.limit)] ?? ''} auf dieser Instanz.`.replace(/ {2,}/g, ' ');
     },
+    plan_unknown: (p: Params) => `Einen Tarif „${s(p.plan)}“ gibt es auf dieser Instanz nicht.`,
+    billing_disabled: () => 'Auf dieser Instanz lässt sich der Tarif nicht in der App ändern.',
   } as Record<string, (p: Params) => string>,
   warnings: {
     km_gap: (p: Params) => `${s(p.car)}: ${s(p.from_km)} – ${s(p.to_km)} ist keiner Fahrt zugeordnet`,

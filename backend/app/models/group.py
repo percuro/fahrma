@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -21,6 +21,12 @@ class Group(Base):
     # IANA time zone that defines "today" for this group; NULL = the instance's DEFAULT_TIMEZONE
     timezone: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, server_default=func.now())
+    # Hosting: the group's plan (an id from PLANS_FILE); NULL = the default plan
+    plan: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Last day the plan is valid (inclusive, in the group's time zone); NULL = no end
+    plan_until: Mapped[date | None] = mapped_column(Date, nullable=True)
+    # For the operator only (e.g. an invoice number); never shown to the group
+    plan_note: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
     memberships: Mapped[list["Membership"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 

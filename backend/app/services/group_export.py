@@ -25,6 +25,10 @@ from app.services.access import GroupContext
 from app.services.auth_service import utcnow
 from app.services.rows import row_dict
 
+# The plan belongs to the instance, not to the group's data: it does not move along, and
+# the operator's note is never shown to the group
+INSTANCE_ONLY_COLUMNS = frozenset({"plan", "plan_until", "plan_note"})
+
 
 def export_group(ctx: GroupContext) -> dict:
     db, group_id = ctx.db, ctx.group.id
@@ -52,7 +56,7 @@ def export_group(ctx: GroupContext) -> dict:
         "format": FORMAT,
         "app_version": __version__,
         "exported_at": utcnow().isoformat(),
-        "group": row_dict(ctx.group),
+        "group": row_dict(ctx.group, exclude=INSTANCE_ONLY_COLUMNS),
         "members": [
             {
                 "user_id": user.id,

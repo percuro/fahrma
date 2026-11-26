@@ -23,6 +23,7 @@ from app.services.audit_service import record
 from app.services.auth_service import AuthService, utcnow
 from app.services.limits import check_new_group, check_new_member
 from app.services.placeholders import delete_orphans, new_placeholder
+from app.services.plans import group_plan_read
 from app.services.reservation_service import delete_upcoming
 
 
@@ -87,6 +88,7 @@ def group_read(ctx: GroupContext, today: date) -> dict:
             }
             for membership, user in rows
         ],
+        "plan": group_plan_read(ctx.db, ctx.group, today),
     }
 
 

@@ -8,8 +8,10 @@ from app.db.database import get_db
 from app.models.user import User
 from app.schemas.admin import AdminUserRead, AdminUserUpdate
 from app.schemas.invitation import InvitationCreate, InvitationCreated, InvitationRead, PasswordResetCreate
+from app.schemas.plans import OperatorGroupRead, PlanUpdate
 from app.services.admin_service import AdminService
 from app.services.invitation_service import InvitationService
+from app.services.plans import get_group, list_groups, operator_group_read, set_plan
 
 router = APIRouter()
 
@@ -68,3 +70,17 @@ def list_invitations(db: Session = Depends(get_db)):
 @router.delete("/invitations/{invitation_id}", status_code=status.HTTP_204_NO_CONTENT)
 def revoke_invitation(invitation_id: int, db: Session = Depends(get_db)):
     InvitationService(db).revoke(invitation_id)
+
+
+@router.get("/groups", response_model=list[OperatorGroupRead])
+def admin_list_groups(db: Session = Depends(get_db)):
+    """Groups with plan, counts and admins; never entries or amounts."""
+    return list_groups(db)
+
+
+@router.put("/groups/{group_id}/plan", response_model=OperatorGroupRead)
+def admin_update_plan(group_id: int, data: PlanUpdate, db: Session = Depends(get_db)):
+    group = get_group(db, group_id)
+    set_plan(db, group, data.plan, data.until, data.note)
+    db.commit()
+    return operator_group_read(db, group)

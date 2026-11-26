@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+Hosting fahrma for others: plans per group, without payment code.
+
+- **Plans per group** (`PLANS_FILE`): a free and a paid plan, say, each with its own limit of members and cars. The group page shows the group's plan, until when it is valid and what counts against it (*2 of 5 members*). Without `PLANS_FILE` nothing changes.
+- **Change plan** (`BILLING_URL`): group admins go to the operator's pricing page or billing service, with the group's number in the address (after `#`, so it never reaches access logs) and, with `OPERATOR_TOKEN`, a signed token valid for an hour.
+- **Instance administration → Groups:** every group with its plan, size, admins and last change – no trips, no amounts. Instance admins set a plan with a last day and a note for themselves (an invoice number, say), which the group never sees.
+- **Operator API** (`OPERATOR_TOKEN`) for the operator's own billing service: list groups, set a group's plan, check a token from a billing link. See [operator-api.md](docs/operator-api.md).
+- **Plans never lock anyone out:** when a plan runs out or gets smaller, the group falls back to the default plan and keeps everything; only adding cars or members beyond the limits is refused, and the message names the plan. A plan file that becomes invalid while running keeps the plans read before in force.
+- `app.cli.stats` counts groups per plan.
+
+### Security
+
+- The operator API accepts only its bearer token (compared in constant time), never a login; without the token it does not exist (404). It sees plans and counts, never entries or amounts.
+- Billing links are signed with a key derived from the operator token, valid for one hour, and only accepted while the person is still an admin of the group.
+- The group export (`fahrma-group/1`) leaves the plan and the operator's note out: a plan belongs to the instance and does not move with a group.
+
+### Upgrade notes
+
+- Migration `0008` adds `plan`, `plan_until` and `plan_note` to `groups`; existing groups have the default plan.
+- New optional settings `PLANS_FILE`, `BILLING_URL`, `OPERATOR_TOKEN`/`OPERATOR_TOKEN_FILE`, see [configuration](docs/configuration.md#plans). With `PLANS_FILE`, set the limits per group in the file instead of `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP` (the start refuses both); `MAX_GROUPS_PER_USER` stays per account.
+- API: `GET /v1/groups/{id}` has `plan`; `/v1/meta` has `plans`, `default_plan` and `billing`; new `POST /v1/groups/{id}/billing-link`, `GET /v1/admin/groups`, `PUT /v1/admin/groups/{id}/plan` and the operator routes under `/v1/operator/`. The error `limit_reached` has the parameter `plan` when plans are configured.
+- The roadmap moves: login via OpenID Connect is planned for 0.10, receipt photos for 0.11.
+
 ## 0.8.0 – 2026-11-25
 
 A new look, and one design language shared with pomale.

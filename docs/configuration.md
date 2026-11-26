@@ -30,8 +30,12 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `PUSH_ALLOWED_HOSTS` | – | Further push service hosts, comma-separated, besides those of Google, Mozilla, Apple and Microsoft. |
 | `PUSH_DIR` | – | Development and tests: write each notification as a `.json` file into this directory instead of sending it. |
 | `MAX_GROUPS_PER_USER` | unlimited | Active group memberships per account (creating and joining). Empty or `0` = unlimited. |
-| `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group. |
-| `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. |
+| `MAX_MEMBERS_PER_GROUP` | unlimited | Active members per group (also people without an account). Not together with `PLANS_FILE`: there, each plan has its own. |
+| `MAX_CARS_PER_GROUP` | unlimited | Cars per group that are not archived. Not together with `PLANS_FILE`. |
+| `PLANS_FILE` | – | JSON file with the plans a group can have, each with its own limits; see [Plans](#plans). Unset: every group has the limits of `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP`. |
+| `BILLING_URL` | – | Page where group admins change their group's plan (pricing page, contact form or your billing service); the group page then shows *Change plan*. See [Plans](#plans). |
+| `OPERATOR_TOKEN` | – | Turns on the [operator API](operator-api.md) for your own tools, e.g. a billing service; at least 32 characters (`openssl rand -hex 32`). Also signs the billing links. |
+| `OPERATOR_TOKEN_FILE` | – | Read the token from a file instead (e.g. a Docker secret); wins over `OPERATOR_TOKEN`. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`. |
 | `API_DOCS` | `false` | `true` serves the OpenAPI documentation at `/api/docs`. Meant for development. |
 | `FRONTEND_DIST` | `/app/frontend` in the image | Directory with the built frontend. Unset: API only (development with Vite). |
@@ -62,6 +66,32 @@ Notifications work without configuration. On first use the instance creates a ke
 - **Where:** per device and login, switched on in the profile. Logging out ends it on that device. On iPhone and iPad (iOS 16.4 or later) only the app added to the home screen can receive notifications.
 - **How:** messages are encrypted for the device and only go to the push services of the browsers (`fcm.googleapis.com`, `push.services.mozilla.com`, `push.apple.com`, `notify.windows.com`), never to an address a client hands in. The server needs outgoing HTTPS to them.
 - **When:** reminders are checked once a minute inside the app; there is no separate worker or cron job.
+
+## Plans
+
+For hosting fahrma for others, each group can have a plan with its own limits – a free one and a paid one, say. fahrma contains no payment code: you decide outside the app who gets which plan and set it on the administration page (profile → *Instance administration* → *Groups*) or through the [operator API](operator-api.md).
+
+```json
+{
+  "default": "free",
+  "plans": [
+    { "id": "free", "name": { "de": "Gratis", "en": "Free" }, "members_per_group": 5, "cars_per_group": 1 },
+    { "id": "plus", "name": "Plus", "members_per_group": 25, "cars_per_group": 5 },
+    { "id": "club", "name": { "de": "Verein", "en": "Club" } }
+  ]
+}
+```
+
+- `id`: 1–32 characters `a-z`, `0-9`, `-`, `_`; stored with the group, so do not rename it once in use.
+- `name`: one text, or one per language; shown to the group's members.
+- `members_per_group`, `cars_per_group`: missing, `null` or `0` = unlimited.
+- `default`: the plan of every group without its own – new groups, imported groups, groups whose plan ran out or was removed from the file.
+
+A group's plan can have a last day (*valid until*, in the group's time zone); afterwards the default plan applies again. **Nothing is ever locked or deleted** when a plan ends or gets smaller: the group keeps every car, member and entry and works as before; only adding cars or members beyond the limits of the plan now in force is refused, with a message that names the plan. A group moved in from another instance has to fit the default plan.
+
+Changes to the file take effect without a restart. An invalid file stops the start with a message; if it becomes invalid while running, the plans read before stay in force and the error is logged. Plans and their limits are public (`/api/v1/meta`), so the app can show them.
+
+With `BILLING_URL`, group admins see *Change plan* on the group page. It opens `BILLING_URL#group=<id>&plan=<current plan>` – and, with `OPERATOR_TOKEN`, `&token=<signed token>` that your billing service can check through the operator API, see [operator-api.md](operator-api.md#billing-links). The part after `#` never reaches access logs.
 
 ## Limits
 

@@ -9,6 +9,8 @@ def _value(value):
     return value
 
 
-def row_dict(row) -> dict:
-    """All columns of an ORM object, dates as ISO strings."""
-    return {column.name: _value(getattr(row, column.key)) for column in row.__table__.columns}
+def row_dict(row, exclude: frozenset[str] = frozenset()) -> dict:
+    """All columns of an ORM object except ``exclude``, dates as ISO strings."""
+    return {
+        column.name: _value(getattr(row, column.key)) for column in row.__table__.columns if column.name not in exclude
+    }

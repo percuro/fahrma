@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { apiFetch, apiUrl, errorText } from '../lib/api';
 import { parseKm } from '../lib/format';
 import type { Car, EnergyUnit, Group, GroupInviteCreated, Member } from '../lib/types';
+import { planName } from '../lib/plans';
 import { useAudit, useCars, useGroup, useGroupId, useGroupMutation, useMemberNames } from '../hooks/useGroupData';
 import { ME_KEY } from '../hooks/useMe';
 import { useSession } from '../hooks/useSession';
@@ -28,6 +29,7 @@ export function GroupPage() {
       <Members />
       {isAdmin && <Invite />}
       <Cars isAdmin={isAdmin} />
+      <PlanCard group={data} />
       {isAdmin && <GroupSettings group={data} />}
       <DataExport />
       <AuditLog />
@@ -336,6 +338,55 @@ function useTimezones(current: string | null): string[] {
     if (current) zones.add(current);
     return [...zones].sort();
   }, [current]);
+}
+
+/** The group's plan with what counts against it; only on instances with plans. */
+function PlanCard({ group }: { group: Group }) {
+  const t = useT();
+  const g = t.group;
+  const { lang } = useI18n();
+  const f = useFormat();
+  const meta = useMeta();
+  const link = useGroupMutation<void, { url: string }>('POST', () => '/billing-link');
+  const plan = group.plan;
+  if (!meta.data?.plans || !plan) return null;
+  const isAdmin = group.my_role === 'admin';
+  const rows: [string, number, number | null][] = [
+    [g.planMembers, plan.usage.members_per_group, plan.members_per_group],
+    [g.planCars, plan.usage.cars_per_group, plan.cars_per_group],
+  ];
+  const change = () => link.mutate(undefined, { onSuccess: ({ url }) => window.location.assign(url) });
+  return (
+    <section className="card" aria-labelledby="plan-title">
+      <h2 className="mt-0" id="plan-title">{g.plan}</h2>
+      <p className="m-0">
+        <strong>{planName(plan.name, lang)}</strong>
+        {plan.until && <span className="subtle"> · {g.planUntil(f.date(plan.until))}</span>}
+      </p>
+      <ul className="list">
+        {rows.map(([label, used, max]) => (
+          <li key={label} className="row">
+            <span className="main">{label}</span>
+            <span>
+              {max === null ? `${g.planUsage(used, null)} · ${g.planUnlimited}` : g.planUsage(used, max)}
+              {max !== null && used >= max && <span className="subtle"> · {g.planFull}</span>}
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="subtle small">{g.planHint}</p>
+      {isAdmin && meta.data.billing && (
+        <>
+          <button type="button" className="button" onClick={change} disabled={link.isPending} aria-describedby="plan-change-hint">
+            {g.planChange}
+          </button>
+          <p id="plan-change-hint" className="hint">{g.planChangeHint}</p>
+        </>
+      )}
+      {!isAdmin && meta.data.billing && <p className="subtle small m-0">{g.planAdminsOnly}</p>}
+      {link.isError && <p className="error" role="alert">{errorText(link.error)}</p>}
+    </section>
+  );
 }
 
 function GroupSettings({ group }: { group: Group }) {

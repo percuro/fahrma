@@ -391,6 +391,17 @@ export const en: Messages = {
     archived: 'retired',
     noCars: 'No car yet.',
     addCar: '+ Car',
+    plan: 'Plan',
+    planUntil: (date: string) => `valid until ${date}`,
+    planUsage: (used: number, max: number | null) => (max === null ? `${used}` : `${used} of ${max}`),
+    planMembers: 'Members',
+    planCars: 'Cars',
+    planUnlimited: 'unlimited',
+    planFull: 'full',
+    planHint: 'Retired cars and people who left do not count.',
+    planChange: 'Change plan',
+    planChangeHint: 'Opens the operator’s page for plans.',
+    planAdminsOnly: 'Admins of the group can change the plan.',
     settings: 'Group settings',
     rename: 'Group name',
     currency: 'Currency',
@@ -546,6 +557,21 @@ export const en: Messages = {
     sentTo: (email: string) => `Sent to ${email}.`,
     resetByMail: 'Link by e-mail',
     resetSent: (name: string, email: string) => `Link for @${name} sent to ${email} – valid for 24 hours, once:`,
+    groupsTitle: 'Groups',
+    groupsHint: 'Plan, size and admins of every group – no trips, no amounts.',
+    noGroups: 'No groups yet.',
+    groupSize: (members: number, cars: number) =>
+      `${members === 1 ? '1 member' : `${members} members`} · ${cars === 1 ? '1 car' : `${cars} cars`}`,
+    groupAdmins: (names: string) => `admins: ${names}`,
+    lastActivity: (date: string) => `last change ${date}`,
+    plan: 'Plan',
+    planDefault: (name: string) => `Default (${name})`,
+    planUntil: 'Valid until (last day)',
+    planUntilHint: 'Empty: until changed again. Afterwards the default plan applies; nothing is deleted.',
+    planNote: 'Note (only visible here, e.g. invoice number)',
+    planExpired: (name: string, date: string) => `${name} ran out on ${date}`,
+    planUnknown: (id: string) => `${id} (no longer in the plans file)`,
+    planEdit: 'Change plan',
   },
   errors: {
     csrf_rejected: () => 'Request origin not allowed. Please reload the page.',
@@ -645,8 +671,13 @@ export const en: Messages = {
         members_per_group: 'members per group',
         cars_per_group: 'cars per group',
       };
+      if (p.plan) {
+        return `The group’s plan allows at most ${s(p.max)} ${what[s(p.limit)] ?? ''}. Admins of the group can change the plan on the group page.`.replace(/ {2,}/g, ' ');
+      }
       return `Limit reached: at most ${s(p.max)} ${what[s(p.limit)] ?? ''} on this instance.`.replace(/ {2,}/g, ' ');
     },
+    plan_unknown: (p: Params) => `There is no plan “${s(p.plan)}” on this instance.`,
+    billing_disabled: () => 'Plans cannot be changed in the app on this instance.',
   },
   warnings: {
     km_gap: (p: Params) => `${s(p.car)}: ${s(p.from_km)} – ${s(p.to_km)} is not assigned to a trip`,

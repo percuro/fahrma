@@ -14,10 +14,16 @@ Running fahrma for your family is one thing; running it for people you do not kn
 - [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language, e-mail address if given), people without an account whom a group added (their name only), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log), and your reverse proxy's and backups' own logs and retention.
 - [ ] People can download their data (profile → *My data*, JSON) and delete their account themselves. Deleting keeps their bookings in shared groups under an anonymous name, so the other members' balances stay correct – mention that in the privacy policy.
 
-## Limits
+## Limits and plans
 
-- [ ] Set `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP` if you want to cap usage (for example per plan). Reaching a limit shows a clear message; archiving a car frees its place.
-- [ ] `python -m app.cli.stats` prints numbers only (accounts, groups, entries per month) – useful for capacity planning without looking into anyone's data.
+One instance carries many groups; you do not need an instance per customer. The group is the unit that has a plan.
+
+- [ ] Simple caps for everyone: `MAX_GROUPS_PER_USER`, `MAX_MEMBERS_PER_GROUP` and `MAX_CARS_PER_GROUP`. Reaching a limit shows a clear message; archiving a car frees its place.
+- [ ] Different limits per group – a free plan and a paid one: describe them in `PLANS_FILE` ([plans](configuration.md#plans)) and keep `MAX_GROUPS_PER_USER` as a cap per account. Members see their group's plan and what counts against it on the group page.
+- [ ] Decide how a group gets a bigger plan. By hand: set `BILLING_URL` to your pricing or contact page (it receives the group number), invoice outside the app, and set the plan with an end date under profile → *Instance administration* → *Groups*; the note field is for your invoice number. Automated: a billing service of your own behind `BILLING_URL` that checks the signed link and sets the plan through the [operator API](operator-api.md).
+- [ ] Plans never lock anyone out: when a plan ends or gets smaller, groups keep everything and only cannot add beyond the new limits. Say so in your terms.
+- [ ] Mention in your privacy policy what billing involves: the group number, the admin's name and confirmed e-mail address go to your billing service when someone changes the plan.
+- [ ] `python -m app.cli.stats` prints numbers only (accounts, groups, groups per plan, entries per month) – useful for capacity planning without looking into anyone's data.
 
 ## Moving groups
 
@@ -28,10 +34,11 @@ Running fahrma for your family is one thing; running it for people you do not kn
 - [ ] TLS reverse proxy in front, the container port only reachable from the proxy, `PUBLIC_URL` with `https://`.
 - [ ] Nightly backups with `app.cli.dump_sql`, kept off the server and encrypted, with a retention period that matches your privacy policy; test a restore regularly ([self-hosting.md](self-hosting.md#backup-and-restore)).
 - [ ] Monitor `GET /api/health` and the backup job.
+- [ ] With `OPERATOR_TOKEN`: keep it in a file (`OPERATOR_TOKEN_FILE`, e.g. a Docker secret), only in your billing service, and rotate it if it leaks (open billing links stop working then, which is harmless).
 - [ ] Watch for new releases and read the [changelog](../CHANGELOG.md) before updating; pin image versions for deliberate updates.
 - [ ] One instance, one worker: SQLite and the in-memory rate limits are built for that. A single small server carries many groups.
 
 ## What fahrma does not do (yet)
 
-- No payment handling: plans and billing are up to you, outside the app; limits can be set per instance.
+- No payment handling: fahrma knows plans and their limits, but who pays what is up to you, outside the app (see above).
 - No notifications by mail about entries or settlements; reminders and news come by Web Push.
