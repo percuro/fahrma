@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.9.0-rc.1 – 2026-11-26
+## 0.9.0 – 2026-11-26
 
-Hosting fahrma for others: plans per group, without payment code.
+Hosting fahrma for others: plans per group without payment code, and unused accounts deleted after a warning.
 
 - **Plans per group** (`PLANS_FILE`): a free and a paid plan, say, each with its own limit of members and cars. The group page shows the group's plan, until when it is valid and what counts against it (*2 of 5 members*). Without `PLANS_FILE` nothing changes.
 - **Change plan** (`BILLING_URL`): group admins go to the operator's pricing page or billing service, with the group's number in the address (after `#`, so it never reaches access logs) and, with `OPERATOR_TOKEN`, a signed token valid for an hour.
