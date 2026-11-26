@@ -25,6 +25,9 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     role: Mapped[str] = mapped_column(String(16), nullable=False, default=ROLE_USER, server_default=ROLE_USER)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # INACTIVE_DELETE_MONTHS: when the account was warned that it will be deleted; a later
+    # login (last_seen_at) makes the warning void
+    inactivity_warned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Deleted accounts stay as an anonymous row, because the bookings of a group refer to them
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # A member of an imported group who has no account yet; cannot log in, can be claimed by link

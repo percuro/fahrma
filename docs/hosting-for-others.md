@@ -12,6 +12,7 @@ Running fahrma for your family is one thing; running it for people you do not kn
 
 - [ ] Publish an imprint, a privacy policy and terms of use on your own website and set `IMPRINT_URL`, `PRIVACY_URL` and `TERMS_URL`. They appear on the login, registration, invitation and profile pages. With open registration and `TERMS_URL`, new accounts must tick that they accept the terms.
 - [ ] What the privacy policy should cover, from the app's side: accounts (username, display name, password hash, language, e-mail address if given), people without an account whom a group added (their name only), sessions (time of login and last activity, a coarse device name such as "iPhone · Safari"; no IP addresses are stored by the app), group contents (cars, trips, fuel, costs, settlements, change log), and your reverse proxy's and backups' own logs and retention.
+- [ ] Set `INACTIVE_DELETE_MONTHS` (24, say) so that unused accounts do not stay forever, and name the period in your privacy policy. People are warned by mail 30 days before; check first with `python -m app.cli.inactive --months 24` ([details](configuration.md#deleting-unused-accounts)).
 - [ ] People can download their data (profile → *My data*, JSON) and delete their account themselves. Deleting keeps their bookings in shared groups under an anonymous name, so the other members' balances stay correct – mention that in the privacy policy.
 
 ## Limits and plans

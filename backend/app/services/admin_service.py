@@ -10,6 +10,7 @@ from app.models.user import ROLE_USER, User
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.admin import AdminUserRead, AdminUserUpdate
 from app.services.account_service import AccountService
+from app.services.inactive_accounts import deletion_day
 
 
 class AdminService:
@@ -83,4 +84,5 @@ class AdminService:
             created_at=user.created_at,
             last_seen_at=user.last_seen_at,
             group_count=group_count,
+            deletion_due=deletion_day(user),
         )

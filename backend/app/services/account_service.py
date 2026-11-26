@@ -157,8 +157,10 @@ class AccountService:
         user.username = f"~deleted-{user.id}"  # "~" is not allowed in usernames, so it never collides
         user.display_name = anonymous_name(user.id)
         user.password_hash = "!"  # matches no password
+        user.email = None
         user.locale = None
         user.notify = None
+        user.inactivity_warned_at = None
         user.role = ROLE_USER
         user.is_active = False
         user.last_seen_at = None

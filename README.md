@@ -20,7 +20,7 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 - **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. People who do not want an account can be added by name; the others record for them, and a personal link lets them take over later. Audit log of every change, CSV and complete JSON export.
 - **Move freely:** export a group as JSON and import it on another instance – self-hosted to hosted and back – with every entry and settlement intact.
 - **Optional e-mail:** forgot password, confirmed addresses, invitations by mail, registration with address confirmation. Without it, everything works with links.
-- **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up.
+- **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up. Operators can have unused accounts deleted after a warning.
 - **Instance administration:** accounts, roles, invitation and password-reset links – without seeing anybody's trips. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
 - **Plans per group** for hosting it for others: a free and a paid plan, say, each with its own limits; members see theirs on the group page. fahrma handles no money – you set plans by hand or let your own billing service do it through the [operator API](docs/operator-api.md). A plan that ends never locks anyone out.
 - **German and English**, currency and time zone per group.

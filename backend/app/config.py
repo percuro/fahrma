@@ -353,6 +353,25 @@ def get_operator_token() -> str | None:
     return token
 
 
+MIN_INACTIVE_DELETE_MONTHS = 3
+
+
+def get_inactive_delete_months() -> int | None:
+    """Delete accounts after this many months without a login (with a warning first); None = never."""
+    value = os.getenv("INACTIVE_DELETE_MONTHS", "").strip()
+    if not value or value == "0":
+        return None
+    try:
+        months = int(value)
+    except ValueError as exc:
+        raise ConfigError(f"INACTIVE_DELETE_MONTHS must be a whole number (got {value!r})") from exc
+    if months < MIN_INACTIVE_DELETE_MONTHS:
+        raise ConfigError(
+            f"INACTIVE_DELETE_MONTHS must be at least {MIN_INACTIVE_DELETE_MONTHS} or 0 for never (got {value!r})"
+        )
+    return months
+
+
 SMTP_SECURITY_MODES = {"starttls": 587, "tls": 465, "none": 25}
 
 
@@ -468,5 +487,6 @@ def validate() -> None:
     get_plans(strict=True)
     get_billing_url()
     get_operator_token()
+    get_inactive_delete_months()
     get_mail_settings()
     get_push_settings()

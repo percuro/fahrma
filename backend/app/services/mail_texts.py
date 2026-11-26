@@ -4,7 +4,7 @@ Like the CSV export, a mail is something people keep, so it is written in the re
 language on the server. Everything else the interface shows lives in the frontend.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from fastapi import Request
 
@@ -321,5 +321,54 @@ your account “{username}” uses a different e-mail address from now on. This 
 longer receives messages from {APP_NAME}.
 
 If you did not change it yourself, contact the admins of your instance.
+""",
+    )
+
+
+def inactive_warning(to: str, locale: str, username: str, months: int, last_seen: date, due: date) -> Mail:
+    """INACTIVE_DELETE_MONTHS: the account will be deleted unless it is used again."""
+    login = get_public_url()
+    if locale == "de":
+        return _mail(
+            to,
+            locale,
+            f"Dein Zugang bei {APP_NAME} wird am {due:%d.%m.%Y} gelöscht",
+            f"""
+Hallo,
+
+du hast deinen Zugang „{username}“ bei {APP_NAME} seit dem {last_seen:%d.%m.%Y} nicht mehr
+benutzt. Damit keine Daten unnötig liegen bleiben, löscht diese Instanz Zugänge nach
+{months} Monaten ohne Anmeldung.
+
+Dein Zugang wird am {due:%d.%m.%Y} gelöscht. Wenn du ihn behalten willst, melde dich vorher
+einfach an:
+
+{login}
+
+Was beim Löschen passiert: Deine Fahrten und Zahlungen bleiben in Fahrgemeinschaften mit
+anderen Mitgliedern unter einem anonymen Namen erhalten, damit deren Abrechnungen stimmen.
+Fahrgemeinschaften ohne weitere Mitglieder werden mit allen Einträgen gelöscht. Vorher
+kannst du unter Profil → Meine Daten alles herunterladen.
+""",
+        )
+    return _mail(
+        to,
+        locale,
+        f"Your {APP_NAME} account will be deleted on {due:%Y-%m-%d}",
+        f"""
+Hello,
+
+you have not used your account “{username}” with {APP_NAME} since {last_seen:%Y-%m-%d}. So
+that no data is kept without need, this instance deletes accounts after {months} months
+without a login.
+
+Your account will be deleted on {due:%Y-%m-%d}. If you want to keep it, simply log in
+before then:
+
+{login}
+
+What deleting means: your trips and payments stay in groups with other members under an
+anonymous name, so that their settlements add up. Groups without other members are deleted
+with all their entries. Before that, you can download everything under Profile → My data.
 """,
     )
