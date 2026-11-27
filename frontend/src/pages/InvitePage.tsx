@@ -41,6 +41,7 @@ export function InvitePage() {
   if (!token || info.isError || !info.data) {
     return (
       <main className="center">
+        <h1>{t.invite.title}</h1>
         <p role="alert">{info.isError ? errorText(info.error) : t.invite.invalid}</p>
         <Link to="/" className="button">{t.app.toStart}</Link>
       </main>

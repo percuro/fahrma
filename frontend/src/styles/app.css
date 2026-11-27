@@ -132,6 +132,10 @@ h2.inline { display: inline; margin: 0; font-size: var(--text-lg); }
 /* "or" between the password form and the provider's button */
 .divider { margin: 0; text-align: center; }
 
+/* ---------- Change of page ---------- */
+/* The content gets the focus after a change of page (like after a page load): no ring around all of it */
+main#content:focus { outline: none; }
+
 /* ---------- Security log ---------- */
 /* Failed attempts and blocks: a mark at the start; the text itself says what happened */
 .security-log .row.warn { box-shadow: inset 3px 0 0 var(--warn-text); padding-left: var(--space-3); }
