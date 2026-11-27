@@ -64,7 +64,8 @@ body::before {
 .transfer .who { flex: 1; min-width: 10rem; }
 
 /* ---------- History ---------- */
-.tabs-inline { display: flex; gap: var(--space-2); margin-bottom: var(--space-3); overflow-x: auto; padding: 3px; margin-inline: -3px; }
+/* Wraps instead of scrolling sideways, so no tab is hidden behind the edge on a phone */
+.tabs-inline { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); padding: 3px; margin-inline: -3px; }
 
 /* ---------- Account and group ---------- */
 /* Collapsible card (password, deleting): the heading is the toggle */
@@ -130,3 +131,11 @@ h2.inline { display: inline; margin: 0; font-size: var(--text-lg); }
 /* ---------- Login through the OIDC provider ---------- */
 /* "or" between the password form and the provider's button */
 .divider { margin: 0; text-align: center; }
+
+/* ---------- Change of page ---------- */
+/* The content gets the focus after a change of page (like after a page load): no ring around all of it */
+main#content:focus { outline: none; }
+
+/* ---------- Security log ---------- */
+/* Failed attempts and blocks: a mark at the start; the text itself says what happened */
+.security-log .row.warn { box-shadow: inset 3px 0 0 var(--warn-text); padding-left: var(--space-3); }

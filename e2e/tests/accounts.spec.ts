@@ -31,7 +31,7 @@ test('change the password, see the devices, log in with the new password', async
   await password.getByLabel('Neues Passwort (mind. 12 Zeichen)').fill('another-password-789');
   await password.getByLabel('Passwort wiederholen').fill('another-password-789');
   await password.getByRole('button', { name: 'Speichern' }).click();
-  await expect(page.getByText('Passwort geändert')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'Passwort geändert' })).toBeVisible();
   await context.close();
 
   const fresh = await anonymousPage(browser);
@@ -40,6 +40,12 @@ test('change the password, see the devices, log in with the new password', async
   await fresh.page.getByLabel('Passwort').fill('another-password-789');
   await fresh.page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(fresh.page.getByRole('navigation', { name: 'Bereiche' })).toBeVisible();
+
+  // The own security log shows the change and the logins
+  await fresh.page.goto('/profile');
+  const log = fresh.page.locator('section', { has: fresh.page.getByRole('heading', { name: 'Letzte Sicherheitsereignisse' }) });
+  await expect(log.getByText('Passwort geändert', { exact: true })).toBeVisible();
+  await expect(log.getByText('Angemeldet', { exact: true }).first()).toBeVisible();
   await fresh.context.close();
 });
 
@@ -70,6 +76,7 @@ test('admin: invitation link, password reset link, deactivate', async ({ browser
   await expect(page.getByRole('heading', { level: 1, name: 'Verwaltung der Instanz' })).toBeVisible();
 
   // Invitation to the instance: create, use in a fresh browser
+  await page.getByRole('tab', { name: 'Einladungen' }).click();
   const note = uniqueName('für');
   await page.getByLabel('Notiz (z. B. für wen)').fill(note);
   await page.getByRole('button', { name: 'Einladungslink erstellen' }).click();
@@ -84,6 +91,7 @@ test('admin: invitation link, password reset link, deactivate', async ({ browser
   await invited.context.close();
 
   // Password reset for Alex
+  await page.getByRole('tab', { name: 'Zugänge' }).click();
   const row = page.getByRole('listitem').filter({ hasText: other.username });
   await row.getByRole('button', { name: 'Link zum Zurücksetzen' }).click();
   await expect(page.getByText(`Link für @${other.username}`)).toBeVisible();
@@ -102,6 +110,14 @@ test('admin: invitation link, password reset link, deactivate', async ({ browser
   await reset.page.reload();
   await expect(reset.page.getByRole('button', { name: 'Anmelden', exact: true })).toBeVisible();
   await reset.context.close();
+
+  // All of it is in the security log, filtered to Alex
+  await page.getByRole('tab', { name: 'Sicherheit' }).click();
+  await page.getByRole('combobox', { name: 'Zugang' }).selectOption({ label: `@${other.username}` });
+  const log = page.getByRole('tabpanel');
+  await expect(log.getByText('Zugang deaktiviert')).toBeVisible();
+  await expect(log.getByText('Link zum Zurücksetzen verwendet')).toBeVisible();
+  await expect(log.getByText('Link zum Zurücksetzen erstellt')).toBeVisible();
 });
 
 test('delete a group after typing its name', async ({ page, request }) => {

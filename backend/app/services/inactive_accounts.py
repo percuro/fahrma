@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from app.config import get_inactive_delete_months, mail_enabled
 from app.models.user import ROLE_ADMIN, User
-from app.services import mail_texts
+from app.services import mail_texts, security_log
 from app.services.account_service import AccountService
 from app.services.auth_service import utcnow
 from app.services.mail import Mail, deliver
@@ -92,6 +92,9 @@ def run_round(db: Session, now: datetime, months: int, dry_run: bool = False) ->
             if dry_run:
                 continue
             user.inactivity_warned_at = now
+            security_log.record(
+                db, "account.inactive_warned", target=user, commit=False, by_mail=bool(send_mail and user.email)
+            )
             if send_mail and user.email:
                 result.warned_by_mail += 1
                 result.mails.append(_warning_mail(user, months, deletion_date(user, months)))
@@ -103,7 +106,7 @@ def run_round(db: Session, now: datetime, months: int, dry_run: bool = False) ->
                 continue
             db.commit()  # keep the warnings of this round, whatever the deletion does
             try:
-                AccountService(db).delete(user)
+                AccountService(db).delete(user, by="inactive")
             except Exception:
                 db.rollback()
                 logger.exception("Deleting inactive account %d failed", user.id)

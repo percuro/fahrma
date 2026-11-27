@@ -50,6 +50,7 @@ npm run dev      # http://localhost:5173, proxies /api to the backend on :8000
 npm test         # Vitest
 npm run lint
 npm run build
+npm run check:bundle   # size budget of the app start (after the build; also in CI)
 ```
 
 `PUBLIC_URL` must be the address in the browser (`http://localhost:5173` with the Vite dev server), otherwise changes are rejected by the CSRF protection.
@@ -82,6 +83,17 @@ E2E_OIDC=1 E2E_BASE_URL=http://localhost:8000 npx playwright test
 ```
 
 Without `E2E_OIDC=1` they are skipped. The backend unit tests use an in-process fake provider (`backend/tests/oidc_fake.py`).
+
+Accessibility: `design.spec.ts` and `accessibility.spec.ts` scan pages and dialogs with axe (WCAG 2.2 AA); see [Accessibility](accessibility.md).
+
+### Upgrade test
+
+`e2e/upgrade/run.sh <old image> <new image>` starts an earlier release, creates data through its API, starts the new image on the same volume and checks that every row, both logins and the open balance survive, that the upgraded instance can book and settle, and that its SQL dump restores every row. CI runs it from 0.3.0 and from the newest release; locally, with Podman and another port:
+
+```bash
+podman build -t app:local .
+ENGINE=podman PORT=8100 e2e/upgrade/run.sh ghcr.io/percuro/fahrma:0.3.0 localhost/app:local
+```
 
 Without Docker, run `uvicorn app.web:application` with `FRONTEND_DIST=../frontend/dist` (after `npm run build`) and a fresh database instead. The first run creates the account through the setup page; later runs log in (`E2E_USERNAME`/`E2E_PASSWORD`, defaults in `e2e/global-setup.ts`). Every test creates its own group, so tests do not depend on each other.
 

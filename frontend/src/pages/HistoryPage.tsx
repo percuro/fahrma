@@ -1,64 +1,29 @@
-import { useRef, type KeyboardEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useCars, useExpenses, useFuel, useGroupId, useMemberNames, useTrips } from '../hooks/useGroupData';
 import { useFormat } from '../hooks/useFormat';
 import { useT } from '../i18n';
 import { queryState } from '../components/queryState';
 import { TripRow } from './DashboardPage';
 import { ReceiptIcon } from '../components/Icons';
+import { Tabs } from '../components/Tabs';
 
 const TABS = ['trips', 'fuel', 'expenses'] as const;
-type Tab = (typeof TABS)[number];
 
 export function HistoryPage() {
   const t = useT();
-  const [params, setParams] = useSearchParams();
-  const requested = params.get('tab');
-  const tab: Tab = TABS.includes(requested as Tab) ? (requested as Tab) : 'trips';
-  const buttons = useRef<(HTMLButtonElement | null)[]>([]);
-
-  const select = (next: Tab, focus = false) => {
-    setParams({ tab: next }, { replace: true });
-    if (focus) buttons.current[TABS.indexOf(next)]?.focus();
-  };
-
-  // Tabs pattern: arrow keys move between tabs, Home/End jump to the ends
-  const onKeyDown = (event: KeyboardEvent) => {
-    const index = TABS.indexOf(tab);
-    const moves: Record<string, number> = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: TABS.length - 1 };
-    if (!(event.key in moves)) return;
-    event.preventDefault();
-    select(TABS[(moves[event.key] + TABS.length) % TABS.length], true);
-  };
-
+  const labels = { trips: t.history.trips, fuel: t.history.fuel, expenses: t.history.expenses };
   return (
     <>
       <h1>{t.history.title}</h1>
-      <div className="tabs-inline" role="tablist" aria-label={t.history.tabs} onKeyDown={onKeyDown}>
-        {TABS.map((key, i) => (
-          <button
-            key={key}
-            ref={(el) => {
-              buttons.current[i] = el;
-            }}
-            id={`tab-${key}`}
-            type="button"
-            role="tab"
-            className="chip"
-            aria-selected={tab === key}
-            aria-controls="history-panel"
-            tabIndex={tab === key ? 0 : -1}
-            onClick={() => select(key)}
-          >
-            {t.history[key]}
-          </button>
-        ))}
-      </div>
-      <div id="history-panel" role="tabpanel" aria-labelledby={`tab-${tab}`}>
-        {tab === 'trips' && <TripList />}
-        {tab === 'fuel' && <FuelList />}
-        {tab === 'expenses' && <ExpenseList />}
-      </div>
+      <Tabs id="history" tabs={TABS} labels={labels} label={t.history.tabs}>
+        {(tab) => (
+          <>
+            {tab === 'trips' && <TripList />}
+            {tab === 'fuel' && <FuelList />}
+            {tab === 'expenses' && <ExpenseList />}
+          </>
+        )}
+      </Tabs>
     </>
   );
 }

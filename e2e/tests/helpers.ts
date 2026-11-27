@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { generateKeyPairSync, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 
 export interface Group {
@@ -171,4 +172,12 @@ export function fakePushSubscription(name: string) {
     keys: { p256dh: point.toString('base64url'), auth: randomBytes(16).toString('base64url') },
     locale: 'de',
   };
+}
+
+export const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'];
+
+/** WCAG 2.2 AA violations of what the page shows now, as "label: rule (count) first element". */
+export async function axeViolations(page: Page, label: string): Promise<string[]> {
+  const result = await new AxeBuilder({ page }).withTags(WCAG_TAGS).analyze();
+  return result.violations.map((v) => `${label}: ${v.id} (${v.nodes.length}) ${v.nodes[0].target.join(' ')}`);
 }

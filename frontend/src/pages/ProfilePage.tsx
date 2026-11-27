@@ -15,6 +15,7 @@ import { useCallbackParams } from '../hooks/useCallbackParams';
 import { useOidcLabel } from '../hooks/useOidcLabel';
 import { callbackErrorText } from '../lib/oidc';
 import { LegalLinks } from '../components/LegalLinks';
+import { OwnSecurityLog } from './SecurityLog';
 
 const LANGUAGE_NAMES = { de: 'Deutsch', en: 'English' } as const;
 
@@ -60,6 +61,7 @@ export function ProfilePage() {
       <SignInSection />
       <ChangePassword />
       <Devices />
+      <OwnSecurityLog />
       <MyData />
       <Logout />
       <DeleteAccount />

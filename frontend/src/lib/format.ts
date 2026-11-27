@@ -35,6 +35,8 @@ export interface Format {
   time(local: string): string;
   /** Date and time of a wall-clock time: "01.12.2026, 08:00" */
   dateTime(local: string): string;
+  /** A moment stored by the server in UTC ("2026-12-01T07:00:00"), in the device's time zone: "01.12.2026, 08:00" */
+  moment(utc: string): string;
   /** A period of wall-clock times, compact when it stays within one day */
   span(startsAt: string, endsAt: string): string;
   /** Storage in megabytes, one decimal at most: "12,3 MB"; at least 1000 MB as "1,2 GB" */
@@ -73,6 +75,14 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
   const dates = new Intl.DateTimeFormat(locale, { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
   const weekdays = new Intl.DateTimeFormat(locale, { weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC' });
   const times = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: 'UTC' });
+  const moments = new Intl.DateTimeFormat(locale, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
   const wallClock = (local: string) => new Date(`${local.slice(0, 16)}:00Z`);
   const weekday = (day: string) => weekdays.format(wallClock(`${day.slice(0, 10)}T00:00`));
   const time = (local: string) => times.format(wallClock(local));
@@ -103,6 +113,7 @@ export function createFormat(lang: Language, currency = 'EUR'): Format {
     weekday,
     time,
     dateTime: (local) => `${dates.format(wallClock(local))}, ${time(local)}`,
+    moment: (utc) => moments.format(new Date(/[zZ]|[+-]\d\d:\d\d$/.test(utc) ? utc : `${utc}Z`)),
     span: (startsAt, endsAt) => {
       const sameDay = startsAt.slice(0, 10) === endsAt.slice(0, 10);
       // Ending at midnight belongs to the day before: "Mo 08:00–24:00"

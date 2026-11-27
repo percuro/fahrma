@@ -19,15 +19,15 @@ from app.schemas.auth import (
     RegisterRequest,
     RegistrationPending,
 )
-from app.services import group_service, setup_service
+from app.services import group_service, security_log, setup_service
 from app.services.auth_service import AccountError, AuthService, require_password_login
+from app.services.client_address import client_ip
 from app.services.invitation_service import InvitationService
 from app.services.login_rate_limiter import LoginRateLimiter, login_rate_limiter
 
 router = APIRouter()
 # Every registration attempt counts (not only failures): at most 5 per IP address and hour
-register_rate_limiter = LoginRateLimiter(window_seconds=60 * 60)
-register_rate_limiter.ip_limit = 5
+register_rate_limiter = LoginRateLimiter("register", window_seconds=60 * 60, ip_limit=5)
 
 
 def me_response(db: Session, user, today: date) -> MeRead:
@@ -64,13 +64,19 @@ def login(
     today: date = Depends(get_today),
 ):
     username = login_in.username.lower()
-    ip_address = request.client.host if request.client else "unknown"
+    ip_address = client_ip(request)
     login_rate_limiter.check(username, ip_address)
     try:
         user = AuthService(AuthRepository(db)).login(login_in, request, response)
     except AppError as exc:
         if exc.status_code == status.HTTP_401_UNAUTHORIZED:
-            login_rate_limiter.record_failure(username, ip_address)
+            # Only for an existing account: a mistyped username is never stored
+            target = AuthRepository(db).get_user_by_username(username)
+            if target is not None and (target.is_deleted or target.placeholder):
+                target = None
+            if target is not None:
+                security_log.record(db, "auth.login_failed", target=target, request=request)
+            security_log.count_failure(db, login_rate_limiter, username, request, target=target)
         raise
     login_rate_limiter.record_success(username)
     return me_response(db, user, today)
@@ -106,9 +112,9 @@ def register(
     with_mail = mail_enabled()
     if with_mail and not data.email:
         raise AppError(status.HTTP_422_UNPROCESSABLE_CONTENT, "email_required", "Please enter your e-mail address")
-    ip_address = request.client.host if request.client else "unknown"
+    ip_address = client_ip(request)
     register_rate_limiter.check(ip_address, ip_address)
-    register_rate_limiter.record_failure(ip_address, ip_address)
+    security_log.count_failure(db, register_rate_limiter, ip_address, request)
     if with_mail:
         InvitationService(db, background).start_registration(data, request)
         return JSONResponse(
@@ -116,7 +122,7 @@ def register(
         )
     service = AuthService(AuthRepository(db))
     try:
-        user = service.create_user(data.username, data.password, data.display_name, locale=data.locale)
+        user = service.create_user(data.username, data.password, data.display_name, locale=data.locale, via="register")
     except AccountError as exc:
         raise exc.to_http() from exc
     service.start_session(user, request, response)

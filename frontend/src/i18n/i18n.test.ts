@@ -46,4 +46,24 @@ describe('translations', () => {
       expect([...codes].filter((code) => !messages.errors[code])).toEqual([]);
     }
   });
+
+  it('names every event of the security log, every limiter and every way an account was made', () => {
+    const events = new Set<string>();
+    const limiters = new Set<string>();
+    const ways = new Set<string>();
+    for (const file of files(BACKEND)) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(/"((?:auth|account|admin|plan|setup)\.[a-z_]+)"/g)) events.add(match[1]);
+      for (const match of source.matchAll(/LoginRateLimiter\(\s*"([a-z_]+)"/g)) limiters.add(match[1]);
+      for (const match of source.matchAll(/via="([a-z_]+)"/g)) ways.add(match[1]);
+    }
+    expect(events.size).toBeGreaterThan(20);
+    // Not shown: anti-spam limits that never concern a login
+    for (const quiet of ['push_test', 'account_mail', 'test']) limiters.delete(quiet);
+    for (const messages of [de, en]) {
+      expect([...events].filter((event) => !messages.security.events[event])).toEqual([]);
+      expect([...limiters].filter((name) => !messages.security.limiters[name])).toEqual([]);
+      expect([...ways].filter((way) => !messages.security.via[way])).toEqual([]);
+    }
+  });
 });

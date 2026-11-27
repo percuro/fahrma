@@ -18,15 +18,14 @@ from app.schemas.notifications import (
     PushSubscriptionWrite,
 )
 from app.services import notification_service, push
+from app.services.client_address import client_ip
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.mail_texts import LOCALES
 
 router = APIRouter()
 
 # Test messages: a handful per hour and account is plenty
-push_test_limiter = LoginRateLimiter(window_seconds=60 * 60)
-push_test_limiter.account_limit = 10
-push_test_limiter.ip_limit = 60
+push_test_limiter = LoginRateLimiter("push_test", window_seconds=60 * 60, account_limit=10, ip_limit=60)
 
 
 def _require_push() -> PushSettings:
@@ -107,7 +106,7 @@ def send_test(
 ):
     """A test notification to this device."""
     _require_push()
-    ip_address = request.client.host if request.client else "unknown"
+    ip_address = client_ip(request)
     push_test_limiter.check(str(user.id), ip_address)
     items = notification_service.push_test_items(db, user, request.state.session_id, clock.now())
     if not items:

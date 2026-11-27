@@ -43,8 +43,9 @@ from app.schemas.invitation import (
     InvitationInfo,
     InvitationRead,
 )
-from app.services import mail_texts
+from app.services import mail_texts, security_log
 from app.services.auth_service import AccountError, AuthService, normalize_username, require_password_login, utcnow
+from app.services.client_address import client_ip
 from app.services.limits import check_new_group, check_new_member
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.mail import Mail, check_account_quota, require_mail, send_later
@@ -59,14 +60,10 @@ KEEP_FINISHED = timedelta(days=30)
 # Links an instance admin manages (the others belong to the person)
 ADMIN_PURPOSES = (PURPOSE_SIGNUP, PURPOSE_PASSWORD_RESET)
 # Wrong tokens per IP address: 20 in 15 minutes (the limiter is keyed by the IP twice)
-invitation_rate_limiter = LoginRateLimiter()
-invitation_rate_limiter.account_limit = invitation_rate_limiter.ip_limit
+invitation_rate_limiter = LoginRateLimiter("invitation", account_limit=20, ip_limit=20)
 # "Forgot password": 10 requests per IP address and 3 mails per account per hour
-reset_ip_limiter = LoginRateLimiter(window_seconds=60 * 60)
-reset_ip_limiter.account_limit = reset_ip_limiter.ip_limit = 10
-reset_account_limiter = LoginRateLimiter(window_seconds=60 * 60)
-reset_account_limiter.account_limit = 3
-reset_account_limiter.ip_limit = 10**9
+reset_ip_limiter = LoginRateLimiter("reset", window_seconds=60 * 60, account_limit=10, ip_limit=10)
+reset_account_limiter = LoginRateLimiter("reset_mail", window_seconds=60 * 60, account_limit=3, ip_limit=10**9)
 
 
 def invalid() -> AppError:
@@ -75,10 +72,6 @@ def invalid() -> AppError:
 
 def email_taken() -> AppError:
     return AppError(status.HTTP_409_CONFLICT, "email_taken", "This address belongs to another account")
-
-
-def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 def new_token() -> tuple[str, str]:
@@ -123,7 +116,7 @@ class InvitationService:
     ) -> InvitationCreated:
         if email:
             require_mail()
-            check_account_quota(admin.id, client_ip(request) if request else "unknown")
+            check_account_quota(admin.id, client_ip(request))
         now = utcnow()
         invitation = Invitation(
             purpose=PURPOSE_SIGNUP,
@@ -133,6 +126,7 @@ class InvitationService:
             created_by_user_id=admin.id,
             expires_at=now + timedelta(days=get_invite_expiry_days()),
         )
+        security_log.record(self.db, "admin.invite_created", actor=admin, commit=False, role=role, emailed=bool(email))
         token = self._create(invitation, now)
         if email:
             locale = mail_texts.pick_locale(admin.locale, request=request)
@@ -165,6 +159,12 @@ class InvitationService:
             email=target.email if send_email else None,
             expires_at=now + (RESET_EXPIRY if admin else SELF_RESET_EXPIRY),
         )
+        if admin is not None:
+            security_log.record(
+                self.db, "account.reset_link_created", actor=admin, target=target, commit=False, emailed=send_email
+            )
+        else:
+            security_log.record(self.db, "account.reset_requested", target=target, commit=False)
         token = self._create(invitation, now)
         if send_email and target.email:
             locale = mail_texts.pick_locale(target.locale, request=request)
@@ -224,7 +224,8 @@ class InvitationService:
             for invitation in invitations
         ]
 
-    def revoke(self, invitation_id: int) -> None:
+    def revoke(self, invitation_id: int, admin: User) -> None:
+        invitation = self.db.get(Invitation, invitation_id)
         deleted = self.db.execute(
             delete(Invitation).where(
                 Invitation.id == invitation_id,
@@ -232,9 +233,14 @@ class InvitationService:
                 Invitation.purpose.in_(ADMIN_PURPOSES),
             )
         ).rowcount
-        self.db.commit()
         if not deleted:
+            self.db.rollback()
             raise AppError(status.HTTP_404_NOT_FOUND, "invitation_not_found", "Invitation not found")
+        target = self.db.get(User, invitation.target_user_id) if invitation and invitation.target_user_id else None
+        security_log.record(
+            self.db, "admin.invite_revoked", actor=admin, target=target, commit=False, purpose=invitation.purpose
+        )
+        self.db.commit()
 
     # --- Group admins -------------------------------------------------------
 
@@ -262,7 +268,7 @@ class InvitationService:
         require_mail()
         ip_address = client_ip(request)
         reset_ip_limiter.check(ip_address, ip_address)
-        reset_ip_limiter.record_failure(ip_address, ip_address)
+        security_log.count_failure(self.db, reset_ip_limiter, ip_address, request)
         value = login.strip().lower()
         user = self.db.scalars(select(User).where(or_(User.username == value, User.email == value))).first()
         if user is None or not user.is_active or user.placeholder or not user.email:
@@ -277,7 +283,7 @@ class InvitationService:
         except AppError:
             # Enough mails for this account for now; the answer stays the same
             return
-        reset_account_limiter.record_failure(key, "-")
+        security_log.count_failure(self.db, reset_account_limiter, key, request, ip_key="-", target=user)
         self.create_password_reset(None, user, send_email=True, request=request)
 
     def request_email_change(self, user: User, email: str, request: Request) -> None:
@@ -475,7 +481,7 @@ class InvitationService:
             username, password = self._new_account_input(data.username, data.password, external)
         self._claim(Invite, invite.id)
         if new_account:
-            user = self._create_account(username, password, data, role=None, email=invite.email)
+            user = self._create_account(username, password, data, role=None, via="group_link", email=invite.email)
             if external is not None:
                 external.attach(user)
         membership = self._membership(group_id, user.id)
@@ -532,9 +538,10 @@ class InvitationService:
             placeholder.is_active = True
             placeholder.email = self._free_email(invite.email)
             self.db.execute(update(Invite).where(Invite.id == invite.id).values(used_by_user_id=placeholder.id))
+            self.db.flush()
             if external is not None:
-                self.db.flush()
                 external.attach(placeholder)
+            security_log.record(self.db, "account.created", target=placeholder, commit=False, via="personal_link")
             account, new_account = placeholder, True
         self.db.add(
             AuditEntry(
@@ -559,7 +566,9 @@ class InvitationService:
     def _signup(self, invitation: Invitation, data: InvitationAccept, external: External | None = None) -> User:
         username, password = self._new_account_input(data.username, data.password, external)
         self._claim(Invitation, invitation.id)
-        user = self._create_account(username, password, data, role=invitation.role, email=invitation.email)
+        user = self._create_account(
+            username, password, data, role=invitation.role, via="invitation", email=invitation.email
+        )
         if external is not None:
             external.attach(user)
         invitation.used_by_user_id = user.id
@@ -590,6 +599,7 @@ class InvitationService:
             raise AppError(status.HTTP_409_CONFLICT, "username_taken", "Username already exists") from exc
         invitation.used_by_user_id = user.id
         invitation.password_hash = None
+        security_log.record(self.db, "account.created", target=user, commit=False, via="register")
         self.db.commit()
         self.db.refresh(user)
         return user
@@ -604,6 +614,7 @@ class InvitationService:
         previous = user.email
         user.email = invitation.email
         invitation.used_by_user_id = user.id
+        security_log.record(self.db, "account.email_changed", target=user, commit=False, first=previous is None)
         try:
             self.db.commit()
         except IntegrityError as exc:
@@ -623,6 +634,7 @@ class InvitationService:
             raise invalid()
         user.password_hash = AuthService.hash_password(password)
         invitation.used_by_user_id = user.id
+        security_log.record(self.db, "account.reset_used", target=user, commit=False, method="password")
         # Every device has to log in again; this browser gets a fresh session afterwards
         self.db.execute(delete(UserSession).where(UserSession.user_id == user.id))
         self.db.commit()
@@ -638,6 +650,7 @@ class InvitationService:
             raise invalid()
         external.attach(user)
         invitation.used_by_user_id = user.id
+        security_log.record(self.db, "account.reset_used", target=user, commit=False, method="oidc")
         # Every device has to log in again; this browser gets a fresh session afterwards
         self.db.execute(delete(UserSession).where(UserSession.user_id == user.id))
         self.db.commit()
@@ -677,11 +690,17 @@ class InvitationService:
             raise exc.to_http() from exc
 
     def _create_account(
-        self, username: str, password: str | None, data: InvitationAccept, role: str | None, email: str | None = None
+        self,
+        username: str,
+        password: str | None,
+        data: InvitationAccept,
+        role: str | None,
+        via: str,
+        email: str | None = None,
     ) -> User:
         try:
             user = self.auth.create_user(
-                username, password, data.display_name, role=role or "user", locale=data.locale, commit=False
+                username, password, data.display_name, role=role or "user", locale=data.locale, commit=False, via=via
             )
         except AccountError as exc:
             self.db.rollback()
@@ -719,7 +738,7 @@ class InvitationService:
         if found is None:
             found = self.db.scalars(select(Invite).where(Invite.token_hash == token_hash)).first()
         if found is None or found.used_at is not None or found.expires_at <= now:
-            invitation_rate_limiter.record_failure(ip_address, ip_address)
+            security_log.count_failure(self.db, invitation_rate_limiter, ip_address, request)
             raise invalid()
         return found
 

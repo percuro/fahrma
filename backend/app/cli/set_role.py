@@ -8,6 +8,7 @@ import argparse
 from app.db.database import SessionLocal
 from app.models.user import ROLE_USER, ROLES
 from app.repositories.auth_repository import AuthRepository
+from app.services import security_log
 
 
 def main() -> None:
@@ -24,6 +25,10 @@ def main() -> None:
             raise SystemExit(f"Account {args.username!r} not found")
         if args.role == ROLE_USER and user.is_admin and repository.count_active_admins(exclude_user_id=user.id) == 0:
             raise SystemExit("This is the last active admin; make another account admin first")
+        if user.role != args.role:
+            security_log.record(
+                db, "admin.role_changed", target=user, commit=False, before=user.role, after=args.role, via="cli"
+            )
         user.role = args.role
         db.commit()
         print(f"{user.username} is now {args.role}.")

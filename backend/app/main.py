@@ -19,6 +19,7 @@ from app.api.routers.reservations import router as reservations_router
 from app.api.routers.settlements import router as settlements_router
 from app.api.routers.setup import router as setup_router
 from app.config import APP_NAME, api_docs_enabled
+from app.middleware.body_limit import limit_body
 from app.middleware.csrf import enforce_csrf
 
 # API docs only on request (API_DOCS=true); not public in production
@@ -31,6 +32,8 @@ app = FastAPI(
     openapi_url="/openapi.json" if _docs else None,
 )
 app.middleware("http")(enforce_csrf)
+# Registered last, so it runs first: a large body is refused before anything reads it
+app.middleware("http")(limit_body)
 
 # Mounted under /api by app.web: /api/v1/groups → /v1/groups here
 app.include_router(health_router)

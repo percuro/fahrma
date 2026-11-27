@@ -44,8 +44,9 @@ from app.models.oidc_state import (
 from app.models.user import AUTH_OIDC, NO_PASSWORD, ROLE_ADMIN, ROLE_USER, OidcIdentity, User, UserSession
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.invitation import InvitationAccept
-from app.services import setup_service
+from app.services import security_log, setup_service
 from app.services.auth_service import USERNAME_PATTERN, AuthService, cookie_settings, utcnow
+from app.services.client_address import client_ip
 from app.services.invitation_service import External, InvitationService
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.oidc_client import Identity, OidcClient, OidcError, get_client, pkce_pair
@@ -57,8 +58,7 @@ STATE_TTL = timedelta(minutes=10)
 # Where the web app may be sent back to after link/reauth
 RETURN_PATHS = ("/", "/profile", "/admin")
 # Starts and failed callbacks per IP address (each start writes a row)
-oidc_rate_limiter = LoginRateLimiter()
-oidc_rate_limiter.account_limit = oidc_rate_limiter.ip_limit = 30
+oidc_rate_limiter = LoginRateLimiter("oidc", account_limit=30, ip_limit=30)
 
 
 def require_settings() -> OidcSettings:
@@ -80,10 +80,6 @@ def hash_state(state: str) -> str:
 def _cookie_path(request: Request) -> str:
     # The API is mounted under /api; the callback lives at <root>/v1/auth/oidc/callback
     return f"{request.scope.get('root_path', '')}/v1/auth/oidc"
-
-
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 def suggest_username(identity: Identity) -> str:
@@ -127,9 +123,9 @@ class OidcService:
     ) -> str:
         """Remember what to do after the provider and return the URL to send the browser to."""
         settings = require_settings()
-        ip_address = _client_ip(request)
+        ip_address = client_ip(request)
         oidc_rate_limiter.check(ip_address, ip_address)
-        oidc_rate_limiter.record_failure(ip_address, ip_address)
+        security_log.count_failure(self.db, oidc_rate_limiter, ip_address, request)
         client = client_for(settings)
         now = utcnow()
         self.db.execute(delete(OidcLoginState).where(OidcLoginState.expires_at <= now))
@@ -207,9 +203,10 @@ class OidcService:
             target = self._finish(row, identity, request, response)
         except OidcFlowError as exc:
             self.db.rollback()
+            if exc.code not in UNLOGGED_ERRORS:
+                security_log.record(self.db, "auth.oidc_failed", request=request, code=exc.code)
             if exc.code in COUNTED_ERRORS:
-                ip_address = _client_ip(request)
-                oidc_rate_limiter.record_failure(ip_address, ip_address)
+                security_log.count_failure(self.db, oidc_rate_limiter, client_ip(request), request)
             response.headers["Location"] = f"{get_public_url()}{exc.page}#error={exc.code}"
             return response
         except AppError as exc:
@@ -290,7 +287,7 @@ class OidcService:
         logger.info("OIDC login of account %s", user.id)
         self.auth.start_session(user, request, response, auth_method=AUTH_OIDC)
 
-    def _new_account(self, username: str, role: str, payload: dict, identity: Identity) -> User:
+    def _new_account(self, username: str, role: str, payload: dict, identity: Identity, via: str) -> User:
         display_name = (payload.get("display_name") or "").strip() or (identity.name or "").strip()[:80] or username
         user = User(
             username=username,
@@ -305,6 +302,8 @@ class OidcService:
         except IntegrityError as exc:
             self.db.rollback()
             raise OidcFlowError("username_taken") from exc
+        details = {"via": via, "method": "oidc"} | ({"role": role} if role != ROLE_USER else {})
+        security_log.record(self.db, "account.created", target=user, commit=False, **details)
         return user
 
     def _free_username(self, base: str) -> str:
@@ -343,7 +342,9 @@ class OidcService:
             raise OidcFlowError("oidc_no_account")
         if setup_service.needs_setup(self.db):
             raise OidcFlowError("setup_required")
-        user = self._new_account(self._free_username(suggest_username(identity)), ROLE_USER, {}, identity)
+        user = self._new_account(
+            self._free_username(suggest_username(identity)), ROLE_USER, {}, identity, via="provider"
+        )
         self._attach(user, identity, new_account=True)
         self.db.commit()
         self._sign_in(user, request, response)
@@ -362,7 +363,7 @@ class OidcService:
         username = payload.get("username") or self._free_username(suggest_username(identity))
         if self.repository.get_user_by_username(username) is not None:
             raise OidcFlowError("username_taken", "/register")
-        user = self._new_account(username, ROLE_USER, payload, identity)
+        user = self._new_account(username, ROLE_USER, payload, identity, via="register")
         self._attach(user, identity, new_account=True)
         self.db.commit()
         self._sign_in(user, request, response)
@@ -378,6 +379,7 @@ class OidcService:
     def _link(self, row, identity: Identity, _request: Request, _response: Response) -> str:
         user, _session = self._signed_in_user(row)
         self._attach(user, identity)
+        security_log.record(self.db, "account.oidc_linked", actor=user, target=user, commit=False)
         self.db.commit()
         logger.info("Account %s linked to the OIDC provider", user.id)
         return "/profile#oidc=linked"
@@ -435,7 +437,7 @@ class OidcService:
         with setup_service.setup_lock():
             if not setup_service.needs_setup(self.db):
                 raise OidcFlowError("setup_done")
-            user = self._new_account(payload.get("username", ""), ROLE_ADMIN, payload, identity)
+            user = self._new_account(payload.get("username", ""), ROLE_ADMIN, payload, identity, via="setup")
             self._attach(user, identity, new_account=True)
             self.db.commit()
         setup_service.clear_token()
@@ -444,13 +446,14 @@ class OidcService:
 
     # --- Unlink -------------------------------------------------------------
 
-    def unlink(self, user: User, by: str) -> None:
+    def unlink(self, user: User, actor: User) -> None:
         deleted = self.db.execute(delete(OidcIdentity).where(OidcIdentity.user_id == user.id)).rowcount
         if not deleted:
             raise AppError(status.HTTP_404_NOT_FOUND, "oidc_not_linked", "This account is not linked")
+        security_log.record(self.db, "account.oidc_unlinked", actor=actor, target=user, commit=False)
         self.db.commit()
         self.db.expire(user, ["oidc_identity"])
-        logger.info("Account %s unlinked from the OIDC provider (by %s)", user.id, by)
+        logger.info("Account %s unlinked from the OIDC provider (by %s)", user.id, actor.id)
 
 
 def _error_page(row: OidcLoginState) -> str:
@@ -463,5 +466,7 @@ def _error_page(row: OidcLoginState) -> str:
 
 # Provider errors that mean "the person said no" or "could not log in"
 DENIED_ERRORS = {"access_denied", "login_required", "consent_required", "interaction_required"}
+# Not worth an entry in the security log: the person cancelled at the provider
+UNLOGGED_ERRORS = {"oidc_denied"}
 # Errors that count against the per-IP limit
 COUNTED_ERRORS = {"oidc_state_invalid", "oidc_invalid_response", "oidc_reauth_failed"}

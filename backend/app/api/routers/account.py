@@ -1,6 +1,6 @@
 """The logged-in account: password, e-mail address, devices, data export, deletion."""
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Request, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -10,6 +10,8 @@ from app.db.database import get_db
 from app.errors import AppError
 from app.models.user import User
 from app.schemas.auth import DeletionPreview, EmailChange, PasswordChange, PasswordConfirmation, SessionRead
+from app.schemas.security_log import OwnSecurityEventPage, OwnSecurityEventRead
+from app.services import security_log
 from app.services.account_service import AccountService
 from app.services.auth_service import clear_session_cookie
 from app.services.invitation_service import InvitationService
@@ -58,6 +60,8 @@ def remove_email(
 ):
     """Without an address there is no "forgot password" by mail for this account."""
     AccountService(db).confirm(user, data.password, request, request.state.session_id)
+    if user.email is not None:
+        security_log.record(db, "account.email_removed", actor=user, target=user, commit=False)
     user.email = None
     db.commit()
 
@@ -121,4 +125,21 @@ def unlink_oidc(
             "Set a password first; without the provider this account could not log in",
         )
     AccountService(db).confirm(user, data.password, request, request.state.session_id)
-    OidcService(db).unlink(user, by="self")
+    OidcService(db).unlink(user, actor=user)
+
+
+@router.get("/security-log", response_model=OwnSecurityEventPage)
+def own_security_log(
+    before_id: int | None = Query(default=None, ge=1, description="next_before_id of the previous page"),
+    limit: int = Query(default=20, ge=1, le=100),
+    user: User = Depends(require_user),
+    db: Session = Depends(get_db),
+):
+    """Logins, failed attempts and changes concerning the own account, newest first."""
+    events = security_log.own_events(db, user, before_id=before_id, limit=limit + 1)
+    more = len(events) > limit
+    events = events[:limit]
+    return OwnSecurityEventPage(
+        events=[OwnSecurityEventRead.model_validate(security_log.own_view(event, user.id)) for event in events],
+        next_before_id=events[-1].id if more else None,
+    )

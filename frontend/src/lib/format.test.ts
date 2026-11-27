@@ -99,6 +99,15 @@ describe('reservation formats', () => {
     expect(de.dateTime('2026-12-01T23:30')).toBe('01.12.2026, 23:30');
   });
 
+  it('shows a moment from the server (UTC) in the device time zone', () => {
+    const local = new Date(Date.UTC(2026, 11, 1, 7, 5));
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const expected = `${pad(local.getDate())}.${pad(local.getMonth() + 1)}.${local.getFullYear()}, ${pad(local.getHours())}:${pad(local.getMinutes())}`;
+    expect(de.moment('2026-12-01T07:05:00')).toBe(expected);
+    expect(de.moment('2026-12-01T07:05:00Z')).toBe(expected);
+    expect(de.moment('2026-12-01T07:05:00.123456')).toBe(expected);
+  });
+
   it('keeps a period short when it stays within a day', () => {
     expect(de.span('2026-12-01T08:00', '2026-12-01T10:30')).toBe('Di., 01.12., 08:00–10:30');
     expect(de.span('2026-12-01T20:00', '2026-12-02T00:00')).toBe('Di., 01.12., 20:00–24:00');

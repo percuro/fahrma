@@ -2,6 +2,8 @@
 
 All settings are environment variables (for Docker Compose: the `.env` file next to `compose.yaml`). Only `PUBLIC_URL` is required.
 
+An empty variable means its default. Switches take `true`/`false`, `on`/`off`, `yes`/`no` or `1`/`0`; numbers are whole numbers above 0. Any other value stops the start with a message naming the variable (see `docker compose logs app`), so a typo never turns a protection off silently.
+
 | Variable | Default | Description |
 |---|---|---|
 | `PUBLIC_URL` | – (required) | Address users open, e.g. `https://cars.example.org`. Must not contain a path. It is the only origin allowed to make changes (CSRF protection), it decides whether cookies are `Secure`, and invitation links are built from it. `PUBLIC_APP_URL` is accepted as a deprecated alias. |
@@ -15,6 +17,7 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `CORS_ORIGINS` | – | Additional origins allowed to make changes, comma-separated. Rarely needed. |
 | `FORWARDED_ALLOW_IPS` | `*` | Proxies whose `X-Forwarded-For`/`-Proto` headers are trusted. `*` is fine when the container port is only reachable through your reverse proxy (as in the provided `compose.yaml`). If the port is exposed, set it to your proxy's address. The login rate limit relies on the client address. |
 | `REGISTRATION` | `invite` | `invite`: accounts only through invitation links (from a group admin, or from an instance admin on the administration page). `open`: anyone can register at `/register`; only possible after the first-run setup. Registrations are limited to 5 per IP address and hour. |
+| `SECURITY_LOG_DAYS` | `180` | How long the [security log](self-hosting.md#security-log) keeps an entry. |
 | `INVITE_EXPIRY_DAYS` | `7` | How long invitation links stay valid. Password-reset links from an admin are valid for 24 hours, those requested by mail for 1 hour. |
 | `IMPRINT_URL`, `PRIVACY_URL`, `TERMS_URL` | – | Links to the operator's imprint, privacy policy and terms of use, shown on the login, registration, invitation and profile pages. With `TERMS_URL` and open registration, new accounts must accept the terms. The texts themselves are yours to write and host. |
 | `OIDC_ISSUER` | – (off) | Login through your own OpenID Connect provider (Authelia, Authentik, Pocket ID, Keycloak, …), in addition to passwords or instead of them. With `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (or `OIDC_CLIENT_SECRET_FILE`), `OIDC_SCOPES`, `OIDC_LABEL` and `OIDC_AUTO_CREATE`; see [Login through your own provider](oidc.md). |
@@ -127,4 +130,5 @@ Say in your privacy policy how long unused accounts are kept.
 
 - Run exactly **one** instance with **one** worker process. State such as the first-run setup token and the login rate limits lives in memory, and SQLite is not meant for several writers across containers. One instance easily serves many groups.
 - The app must be served at the root of its own (sub)domain; serving under a path like `/cars` is not supported.
+- A request body may be at most 1 MB and must come with a `Content-Length` (browsers, curl and reverse proxies send one); the group import and receipt photos have their own limits. A larger body is refused with 413, one sent in chunks without a length with 411.
 - Amounts are stored in cents of the group's currency, distances in whole kilometres. A group's currency can only be changed before its first amount; there is no conversion.

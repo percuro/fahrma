@@ -90,4 +90,4 @@ A photo is evidence, not an amount, so it can still be added to a settled entry;
 
 ## Accessibility
 
-Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting. On iPhone and iPad the text follows the system text size, because an installed web app has no browser zoom. The rules behind this, and the look of the app, are described in the [design language](design-language.md); an automatic WCAG 2.2 AA scan of the main pages runs with the end-to-end tests.
+Large labelled touch targets, visible keyboard focus, state shown as text and not by colour alone, layouts that work with large text, and light and dark colour schemes following the system setting. On iPhone and iPad the text follows the system text size, because an installed web app has no browser zoom. The rules behind this, and the look of the app, are described in the [design language](design-language.md); what is built in and how it is checked is in [Accessibility](accessibility.md).
