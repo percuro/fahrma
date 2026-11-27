@@ -49,6 +49,15 @@ There are five ways to an account that logs in through the provider:
 
 **Accounts without a password** (created through the provider) confirm sensitive changes, such as changing the e-mail address, deleting the account or setting a password, with a login at the provider that is at most 10 minutes old. When it is older, fahrma shows "Confirm with …": the provider is asked for a fresh login (`prompt=login`) and fahrma checks `auth_time`. They can set a password on the profile page later while `PASSWORD_LOGIN=on`.
 
+**Only the provider, as protection.** Logging in through the provider adds nothing while the password still opens the account: whoever wants in takes the weaker way. With a provider that uses passkeys or two factors (Pocket ID, Authelia with 2FA, …), people can therefore give up their password: profile → *Login* → *Remove password*. It needs a login at the provider that is at most 10 minutes old (which also shows that the link works right now), and logs out the other devices. Afterwards:
+
+- the password no longer works, and the account cannot remove its link;
+- "Forgot password" by mail no longer applies to it, so a mailbox is no way around the provider;
+- if the passkey is lost, an instance admin creates a password-reset link (administration → the account); with it the person sets a password or links again;
+- the account can set a password again on the profile page at any time.
+
+For a whole instance, `PASSWORD_LOGIN=off` does the same for everybody at once.
+
 **Unlinking.** People can remove the link themselves only while a password remains. Instance admins can remove an account's link (administration → the account → *Remove link*); this logs the account out everywhere. Then create a password-reset link: with it the person sets a password, or links a provider account again ("Link with …").
 
 **Changing `OIDC_ISSUER`** to another provider makes all existing links useless: the subjects belong to the old issuer. Link the accounts again (each person on the profile page, or with password-reset links).

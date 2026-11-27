@@ -543,6 +543,12 @@ export const de = {
     reauthNeeded: (provider: string) => `Bestätige zuerst bei ${provider}, dass du es bist. Danach hast du 10 Minuten Zeit.`,
     reauthDone: 'Bestätigt. Du kannst die Änderung jetzt speichern.',
     viaProvider: (provider: string) => `über ${provider}`,
+    removePassword: 'Passwort entfernen',
+    removePasswordHint: (provider: string) =>
+      `Ohne Passwort kommt man nur noch mit ${provider} in deinen Zugang – das schützt wie eine Zwei-Faktor-Anmeldung. „Passwort vergessen“ per Mail gilt dann nicht mehr; im Notfall erstellt dir die Verwaltung einen Link.`,
+    removePasswordConfirm: (provider: string) =>
+      `Passwort entfernen? Danach meldest du dich nur noch mit ${provider} an, andere Geräte werden abgemeldet.`,
+    passwordRemoved: (provider: string) => `Passwort entfernt. Du meldest dich jetzt nur noch mit ${provider} an.`,
   },
   notifications: {
     title: 'Benachrichtigungen',
@@ -759,6 +765,7 @@ export const de = {
     reauth_required: () => 'Bitte bestätige die Änderung zuerst beim Anmelde-Anbieter.',
     password_login_disabled: () => 'Auf dieser Instanz meldest du dich nur über den Anbieter an.',
     last_login_method: () => 'Lege zuerst ein Passwort fest – sonst könntest du dich nicht mehr anmelden.',
+    no_password: () => 'Dieser Zugang hat kein Passwort.',
   } as Record<string, (p: Params) => string>,
   warnings: {
     km_gap: (p: Params) => `${s(p.car)}: ${s(p.from_km)} – ${s(p.to_km)} ist keiner Fahrt zugeordnet`,

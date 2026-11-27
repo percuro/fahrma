@@ -1,5 +1,5 @@
 import { expect, test, type APIRequestContext, type Browser, type Page } from '@playwright/test';
-import { anonymousPage, createGroupWithCar, groupInvite, uniqueUsername } from './helpers';
+import { anonymousPage, createGroupWithCar, groupInvite, joinByInvite, OTHER_PASSWORD, uniqueUsername } from './helpers';
 
 /** Set by CI (and local runs) when Dex runs next to the instance; see e2e/oidc/dex.yaml. */
 const OIDC = process.env.E2E_OIDC === '1';
@@ -108,6 +108,38 @@ test.describe('login through OIDC (Dex)', () => {
     await page.getByRole('button', { name: 'Registrieren mit Dex' }).click();
     await dexLogin(page, 'carla@example.org');
     await expect(page.getByRole('link', { name: 'Profil' })).toBeVisible();
+    await context.close();
+  });
+  test('a linked account removes its password and then needs the provider', async ({ browser, request }) => {
+    const { group } = await createGroupWithCar(request);
+    const { context, page, username } = await joinByInvite(browser, request, group.id, 'Ben');
+    await page.goto('/profile');
+    const section = signInSection(page);
+    await section.getByRole('heading', { name: 'Anmeldung' }).click();
+    await section.getByLabel('Dein Passwort zum Verknüpfen').fill(OTHER_PASSWORD);
+    await section.getByRole('button', { name: 'Mit Dex verknüpfen' }).click();
+    await dexLogin(page, 'ben@example.org');
+    await expect(section.getByText('Verknüpft mit Dex als ben@example.org.')).toBeVisible();
+
+    // Logged in with the password: the provider has to confirm first
+    await section.getByRole('button', { name: 'Passwort entfernen' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Passwort entfernen' }).click();
+    await section.getByRole('button', { name: 'Mit Dex bestätigen' }).click();
+    await dexLogin(page, 'ben@example.org');
+    await expect(page.getByRole('status').filter({ hasText: 'Bestätigt' })).toBeVisible();
+    await section.getByRole('button', { name: 'Passwort entfernen' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Passwort entfernen' }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Passwort entfernt' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Passwort festlegen' })).toBeVisible();
+
+    // The password no longer opens the account
+    const other = await anonymousPage(browser);
+    await other.page.goto('/');
+    await other.page.getByLabel('Benutzername').fill(username);
+    await other.page.getByLabel('Passwort').fill(OTHER_PASSWORD);
+    await other.page.getByRole('button', { name: 'Anmelden', exact: true }).click();
+    await expect(other.page.getByRole('alert')).toContainText('falsch');
+    await other.context.close();
     await context.close();
   });
 });

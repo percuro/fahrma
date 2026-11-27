@@ -535,6 +535,12 @@ export const en: Messages = {
     reauthNeeded: (provider: string) => `First confirm at ${provider} that it is you. You then have 10 minutes.`,
     reauthDone: 'Confirmed. You can save the change now.',
     viaProvider: (provider: string) => `via ${provider}`,
+    removePassword: 'Remove password',
+    removePasswordHint: (provider: string) =>
+      `Without a password, only ${provider} gets into your account – as safe as a two-factor login. "Forgot password" by mail then no longer applies; in an emergency the administration creates a link for you.`,
+    removePasswordConfirm: (provider: string) =>
+      `Remove your password? You then log in with ${provider} only, other devices are logged out.`,
+    passwordRemoved: (provider: string) => `Password removed. You now log in with ${provider} only.`,
   },
   notifications: {
     title: 'Notifications',
@@ -749,6 +755,7 @@ export const en: Messages = {
     reauth_required: () => 'Please confirm the change at the login provider first.',
     password_login_disabled: () => 'On this instance you log in through the provider only.',
     last_login_method: () => 'Set a password first – otherwise you could no longer log in.',
+    no_password: () => 'This account has no password.',
   },
   warnings: {
     km_gap: (p: Params) => `${s(p.car)}: ${s(p.from_km)} – ${s(p.to_km)} is not assigned to a trip`,

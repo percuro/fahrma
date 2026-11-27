@@ -120,6 +120,20 @@ export function SignInSection() {
       void queryClient.invalidateQueries({ queryKey: ME_KEY });
     },
   });
+  // Log in with the provider only: needs a fresh login there (the server answers reauth_required)
+  const removePassword = useMutation({
+    mutationFn: () => apiFetch<void>('/v1/account/password', { method: 'DELETE' }),
+    onSuccess: () => {
+      toast(a.passwordRemoved(provider));
+      void queryClient.invalidateQueries({ queryKey: ME_KEY });
+      void queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    },
+  });
+  const askRemovePassword = async () => {
+    if (await confirm(a.removePasswordConfirm(provider), { confirmLabel: a.removePassword, danger: true })) {
+      removePassword.mutate();
+    }
+  };
   // Nothing to show without a provider, unless an old link is left
   if (!meta.data?.oidc && !me.oidc) return null;
   const who = me.oidc ? (me.oidc.email ?? me.oidc.preferred_username) : null;
@@ -129,7 +143,7 @@ export function SignInSection() {
     if (!me.oidc) return link.mutate();
     if (await confirm(a.unlinkConfirm(provider), { confirmLabel: a.unlink, danger: true })) unlink.mutate();
   };
-  const error = link.error ?? unlink.error;
+  const error = link.error ?? unlink.error ?? (needsReauth(removePassword.error) ? null : removePassword.error);
   const busy = link.isPending || link.isSuccess || unlink.isPending;
   return (
     <details className="card" open={initiallyOpen || undefined}>
@@ -151,6 +165,15 @@ export function SignInSection() {
         )}
         {canUnlink && (
           <button type="submit" className="button" disabled={busy || !password}>{a.unlink}</button>
+        )}
+        {canUnlink && (
+          <div className="form mt-1">
+            <p className="subtle small m-0">{a.removePasswordHint(provider)}</p>
+            {needsReauth(removePassword.error) && <ReauthPrompt />}
+            <button type="button" className="button" onClick={askRemovePassword} disabled={removePassword.isPending}>
+              {a.removePassword}
+            </button>
+          </div>
         )}
       </form>
     </details>

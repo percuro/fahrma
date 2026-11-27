@@ -267,6 +267,10 @@ class InvitationService:
         user = self.db.scalars(select(User).where(or_(User.username == value, User.email == value))).first()
         if user is None or not user.is_active or user.placeholder or not user.email:
             return
+        # Without a password the account logs in with the provider only (often on purpose, as
+        # protection): a mailbox must not be a way around it. An instance admin can still create a link.
+        if not user.has_password:
+            return
         key = f"user-{user.id}"
         try:
             reset_account_limiter.check(key, "-")

@@ -27,6 +27,12 @@ def change_password(
     )
 
 
+@router.delete("/password", status_code=status.HTTP_204_NO_CONTENT)
+def remove_password(request: Request, user: User = Depends(require_user), db: Session = Depends(get_db)):
+    """Log in with the OIDC provider only; needs a login at the provider in the last 10 minutes."""
+    AccountService(db).remove_password(user, request.state.session_id)
+
+
 @router.post("/email", status_code=status.HTTP_202_ACCEPTED)
 def change_email(
     data: EmailChange,

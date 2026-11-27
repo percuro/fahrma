@@ -7,6 +7,7 @@ from fastapi import Request, Response, status
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
+from app.config import get_oidc_settings
 from app.errors import AppError
 from app.models.audit import AuditEntry
 from app.models.expense import Expense
@@ -61,6 +62,10 @@ class AccountService:
         if user.has_password:
             self.verify_password(user, password or "", request)
             return
+        self.require_fresh_provider_login(user, session_id)
+
+    def require_fresh_provider_login(self, user: User, session_id: int) -> None:
+        """403 reauth_required unless this session logged in at the provider in the last few minutes."""
         session = self.repository.get_session_for_user(session_id, user.id)
         authenticated_at = (session.authenticated_at or session.created_at) if session is not None else None
         if (
@@ -92,6 +97,26 @@ class AccountService:
         user.password_hash = AuthService.hash_password(new)
         self.db.commit()
         # Every other device has to log in again with the new password
+        self.repository.delete_sessions(user.id, keep_session_id=session_id)
+
+    def remove_password(self, user: User, session_id: int) -> None:
+        """Log in with the provider only: the password stops working, other devices are logged out.
+
+        Needs a fresh login at the provider, which also shows that the link works right now, so
+        nobody locks themselves out. "Forgot password" by mail no longer applies to the account;
+        an instance admin can still create a password-reset link.
+        """
+        if not user.has_password:
+            raise AppError(status.HTTP_409_CONFLICT, "no_password", "This account has no password")
+        if get_oidc_settings() is None or user.oidc_identity is None:
+            raise AppError(
+                status.HTTP_409_CONFLICT,
+                "oidc_not_linked",
+                "Link the account with the provider first; without a password it could not log in otherwise",
+            )
+        self.require_fresh_provider_login(user, session_id)
+        user.password_hash = NO_PASSWORD
+        self.db.commit()
         self.repository.delete_sessions(user.id, keep_session_id=session_id)
 
     def sessions(self, user: User, current_session_id: int) -> list[SessionRead]:

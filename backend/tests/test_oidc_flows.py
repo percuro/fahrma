@@ -471,6 +471,71 @@ class PasswordlessAccountTest(OidcTestCase):
         self.assertCode(response, 401, "invalid_credentials")
 
 
+class RemovePasswordTest(OidcTestCase):
+    """A linked account can give up its password and then logs in with the provider only."""
+
+    def setUp(self):
+        super().setUp()
+        self.env.create_user("alex", role="admin")
+        self.env.create_user("sam")
+        self.link("sam", "sub-ben")
+        self.sam = self.env.client("sam")
+
+    def remove(self, client):
+        return client.request("DELETE", "/v1/account/password")
+
+    def test_needs_a_fresh_login_at_the_provider(self):
+        # Logged in with the password: first confirm at the provider
+        self.assertCode(self.remove(self.sam), 403, "reauth_required")
+        url = self.start(self.sam, purpose="reauth", return_to="/profile")
+        self.assertEqual(self.finish(self.sam, url, "sub-ben"), "/profile#reauth=ok")
+        other_device = self.env.client("sam")
+        self.assertEqual(self.remove(self.sam).status_code, 204)
+        me = self.sam.get("/v1/auth/me").json()
+        self.assertFalse(me["has_password"])
+        # The password no longer works, other devices are logged out, this one stays
+        response = self.guest().post("/v1/auth/login", json={"username": "sam", "password": PASSWORD})
+        self.assertCode(response, 401, "invalid_credentials")
+        self.assertEqual(other_device.get("/v1/auth/me").status_code, 401)
+        self.assertEqual(self.sign_in(self.guest(), "sub-ben"), "/")
+        # Cannot unlink now, and removing again says so
+        self.assertCode(self.sam.request("DELETE", "/v1/account/oidc", json={}), 409, "last_login_method")
+        self.assertCode(self.remove(self.sam), 409, "no_password")
+
+    def test_only_for_linked_accounts(self):
+        alex = self.env.client("alex")
+        self.assertCode(self.remove(alex), 409, "oidc_not_linked")
+        with mock.patch.dict("os.environ", {"OIDC_ISSUER": ""}):
+            self.assertCode(self.remove(self.sam), 409, "oidc_not_linked")
+
+    def test_no_password_reset_by_mail_afterwards(self):
+        from tests.test_mail import MailOutbox
+
+        outbox = MailOutbox()
+        try:
+            db = self.env.SessionLocal()
+            try:
+                db.query(User).filter_by(username="sam").update({"email": "sam@example.org"})
+                db.commit()
+            finally:
+                db.close()
+            response = self.guest().post("/v1/auth/forgot-password", json={"login": "sam"})
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(len(outbox.messages()), 1)
+            url = self.start(self.sam, purpose="reauth")
+            self.finish(self.sam, url, "sub-ben")
+            self.assertEqual(self.remove(self.sam).status_code, 204)
+            response = self.guest().post("/v1/auth/forgot-password", json={"login": "sam"})
+            self.assertEqual(response.status_code, 202)
+            self.assertEqual(len(outbox.messages()), 1)
+            # An instance admin can still create a link (the way back)
+            users = {u["username"]: u for u in self.env.client("alex").get("/v1/admin/users").json()}
+            response = self.env.client("alex").post(f"/v1/admin/users/{users['sam']['id']}/password-reset")
+            self.assertEqual(response.status_code, 201, response.text)
+        finally:
+            outbox.close()
+
+
 class PasswordLoginOffTest(OidcTestCase):
     extra_env = {"PASSWORD_LOGIN": "off", "REGISTRATION": "open"}
 
