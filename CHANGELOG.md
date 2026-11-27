@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.0-rc.1 – 2026-11-27
+## 0.12.0 – 2026-11-27
 
 Beta hardening: a security log of logins and account changes, settings that no longer fail silently, updates tested from 0.3.0, signed images, and a more accessible, lighter app.
 
@@ -23,7 +23,7 @@ Beta hardening: a security log of logins and account changes, settings that no l
 ### Updates and images
 
 - **Tested updates:** every change is tested by starting the 0.3.0 image and the previous release, adding a group with trips, fuel, an expense and a settlement, and starting the new image on the same volume. Rows, logins and the open balance must survive, and the updated instance must book, settle and restore its dump. You can update from any release since 0.3.0 straight to the newest one.
-- Release images are built only after all checks have passed, and are **signed with cosign** in addition to the build provenance attestation. See [Verify the image](docs/self-hosting.md#verify-the-image).
+- Release images are built only after all checks have passed, and are **signed with cosign** in addition to the build provenance attestation; checking the signature needs cosign 3 or newer. See [Verify the image](docs/self-hosting.md#verify-the-image).
 
 ### Accessibility
 
@@ -36,6 +36,10 @@ Beta hardening: a security log of logins and account changes, settings that no l
 
 - The app start loads about a sixth less code (494 instead of 591 kB, 157 kB compressed): pages other than the start, the overview and the trip form load the first time they are opened. Offline use is unchanged; the app keeps all pages on the device.
 - The group list of the instance administration and of the operator API reads all groups with a fixed number of queries instead of five per group.
+
+### Fixes
+
+- After a reload, the app could show the account as it was before a change made a moment earlier elsewhere – for example still "no address" right after confirming the e-mail address from the link. What the app keeps for offline use is shown at once as before, but now always loaded again when the app starts.
 
 ### Upgrade notes
 

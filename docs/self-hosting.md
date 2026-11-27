@@ -112,7 +112,7 @@ cosign verify ghcr.io/percuro/fahrma:0.12.0 \
 gh attestation verify oci://ghcr.io/percuro/fahrma:0.12.0 --repo percuro/fahrma
 ```
 
-Releases before 0.12 have the attestation but no signature.
+This needs cosign 3 or newer: the signatures are stored in the newer Sigstore bundle format, and cosign 2 answers "no signatures found". Releases before 0.12 have the attestation but no signature.
 
 ### Upgrading to 0.4
 
