@@ -7,6 +7,7 @@ applies again. Nothing is ever locked or deleted when a plan ends: only adding c
 members beyond the limits of the plan now in force is refused.
 """
 
+from dataclasses import dataclass
 from datetime import UTC, date, datetime
 
 from fastapi import status
@@ -113,33 +114,64 @@ def set_plan(
     group.plan_note = (note or "").strip() or None
 
 
-def operator_group_read(db: Session, group: Group) -> dict:
-    """What an operator sees about a group: plan, counts, admins' names; never entries or amounts."""
-    today = group_today(group)
-    admins = db.execute(
-        select(User.id, User.display_name)
-        .join(Membership, Membership.user_id == User.id)
-        .where(
-            Membership.group_id == group.id,
-            Membership.role == ROLE_ADMIN,
-            Membership.active.is_(True),
-            User.placeholder.is_(False),
-            User.deleted_at.is_(None),
+@dataclass
+class GroupFacts:
+    """Counts and names of many groups, read with one query each instead of several per group."""
+
+    admins: dict[int, list[dict]]
+    last_activity: dict[int, datetime]
+    members: dict[int, int]
+    cars: dict[int, int]
+    receipt_bytes: dict[int, int]
+
+    @classmethod
+    def read(cls, db: Session, group_ids: list[int]) -> "GroupFacts":
+        admins: dict[int, list[dict]] = {}
+        for group_id, user_id, name in db.execute(
+            select(Membership.group_id, User.id, User.display_name)
+            .join(Membership, Membership.user_id == User.id)
+            .where(
+                Membership.group_id.in_(group_ids),
+                Membership.role == ROLE_ADMIN,
+                Membership.active.is_(True),
+                User.placeholder.is_(False),
+                User.deleted_at.is_(None),
+            )
+            .order_by(User.display_name)
+        ):
+            admins.setdefault(group_id, []).append({"user_id": user_id, "display_name": name})
+
+        def per_group(column, aggregate, *where) -> dict:
+            query = select(column, aggregate).where(column.in_(group_ids), *where).group_by(column)
+            return dict(db.execute(query).all())
+
+        return cls(
+            admins=admins,
+            last_activity=per_group(AuditEntry.group_id, func.max(AuditEntry.created_at)),
+            members=per_group(Membership.group_id, func.count(), Membership.active.is_(True)),
+            cars=per_group(Car.group_id, func.count(), Car.archived.is_(False)),
+            receipt_bytes=per_group(Receipt.group_id, func.sum(Receipt.bytes)),
         )
-        .order_by(User.display_name)
-    ).all()
-    last_activity = db.scalar(select(func.max(AuditEntry.created_at)).where(AuditEntry.group_id == group.id))
+
+
+def operator_group_read(db: Session, group: Group, facts: GroupFacts | None = None) -> dict:
+    """What an operator sees about a group: plan, counts, admins' names; never entries or amounts."""
+    facts = facts or GroupFacts.read(db, [group.id])
     return {
         "id": group.id,
         "name": group.name,
         "created_at": group.created_at,
-        "last_activity_at": last_activity,
+        "last_activity_at": facts.last_activity.get(group.id),
         "plan": group.plan,
         "plan_until": group.plan_until,
         "plan_note": group.plan_note,
-        "effective_plan": effective_plan(group, today).id,
-        "usage": usage(db, group.id),
-        "admins": [{"user_id": user_id, "display_name": name} for user_id, name in admins],
+        "effective_plan": effective_plan(group, group_today(group)).id,
+        "usage": {
+            "members_per_group": facts.members.get(group.id, 0),
+            "cars_per_group": facts.cars.get(group.id, 0),
+            "receipt_mb_per_group": round((facts.receipt_bytes.get(group.id) or 0) / MEGABYTE, 1),
+        },
+        "admins": facts.admins.get(group.id, []),
     }
 
 
@@ -154,4 +186,6 @@ def list_groups(db: Session, plan: str | None = None) -> list[dict]:
     query = select(Group).order_by(Group.id)
     if plan is not None:
         query = query.where(Group.plan == plan)
-    return [operator_group_read(db, group) for group in db.scalars(query)]
+    groups = list(db.scalars(query))
+    facts = GroupFacts.read(db, [group.id for group in groups])
+    return [operator_group_read(db, group, facts) for group in groups]
