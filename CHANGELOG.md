@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.11.0-rc.2 – 2026-11-27
+## 0.11.0 – 2026-11-27
 
 Login through your own OpenID Connect provider: Authelia, Authentik, Pocket ID, Keycloak or any other, next to passwords or instead of them.
 
