@@ -1,5 +1,51 @@
 # Changelog
 
+## 0.12.0-rc.1 – 2026-11-27
+
+Beta hardening: a security log of logins and account changes, settings that no longer fail silently, updates tested from 0.3.0, signed images, and a more accessible, lighter app.
+
+### Security log
+
+- **Instance administration → Security:** logins and failed logins, wrong passwords when confirming a change, blocks by the rate limits, new and deleted accounts, passwords, e-mail addresses, devices logged out, links with the provider, roles, deactivations, instance invitations, password-reset links, plan changes and the warnings before unused accounts are deleted – also when they come from the command line, the operator API or the cleanup of unused accounts. Filter by account or to failed attempts only.
+- **Your own account:** the profile shows *Recent security events* about your account, so you notice a login you do not know; an instance admin who acted stays unnamed. They are also in *My data*.
+- IP addresses are stored only shortened (IPv4 /24, IPv6 /48) and only for failed attempts and blocks; a block is logged once. Passwords, tokens, links and usernames that do not exist are never stored. Usernames are copied, so entries stay readable after a deletion.
+- Kept for `SECURITY_LOG_DAYS` (default 180 days). See [Security log](docs/self-hosting.md#security-log).
+- `app.cli.stats` counts logins, failed attempts and blocks of the last 24 hours.
+
+### Hardening
+
+- **Settings are checked strictly.** A switch must be `true`/`false`, `on`/`off`, `yes`/`no` or `1`/`0`, a number a whole number above 0, `COOKIE_SAMESITE` one of `lax`, `strict` or `none`. Anything else stops the start with a message naming the variable. Before, `CSRF_PROTECTION=ture` silently turned CSRF protection off, and an invalid `SESSION_IDLE_MINUTES` meant the default.
+- **Request size:** a request body may be at most 1 MB and must come with a `Content-Length`; the group import and receipt photos keep their own limits. Before, a large JSON body was read completely before it was refused.
+- **Setup token:** five wrong tokens from anyone blocked the first-run setup for everyone for 15 minutes; they are now counted per IP address.
+- **Operator API:** 20 wrong tokens from one address within 15 minutes block that address for a while (`429`).
+- Stopping the container while a round of reminders, the cleanup of unused accounts or the receipt sweep is running no longer cuts it off; fahrma waits up to 10 seconds. `compose.yaml` gives the container 20 seconds to stop.
+
+### Updates and images
+
+- **Tested updates:** every change is tested by starting the 0.3.0 image and the previous release, adding a group with trips, fuel, an expense and a settlement, and starting the new image on the same volume. Rows, logins and the open balance must survive, and the updated instance must book, settle and restore its dump. You can update from any release since 0.3.0 straight to the newest one.
+- Release images are built only after all checks have passed, and are **signed with cosign** in addition to the build provenance attestation. See [Verify the image](docs/self-hosting.md#verify-the-image).
+
+### Accessibility
+
+- After a change of page the focus moves to the start of the content and screen readers announce the new page, as after a page load.
+- The instance administration is split into tabs (accounts, groups, invitations, security); tabs wrap instead of scrolling sideways on phones.
+- An invalid or used invitation link now has a heading.
+- The automatic WCAG 2.2 AA checks now also cover every tab of the administration, the expense, reservation and import forms, a form showing an error, the confirmation dialog, the pages without an account and the English interface. See [Accessibility](docs/accessibility.md).
+
+### Performance
+
+- The app start loads about a sixth less code (494 instead of 591 kB, 157 kB compressed): pages other than the start, the overview and the trip form load the first time they are opened. Offline use is unchanged; the app keeps all pages on the device.
+- The group list of the instance administration and of the operator API reads all groups with a fixed number of queries instead of five per group.
+
+### Upgrade notes
+
+- **Check the log after the update** (`docker compose logs app`): a setting with a value that was silently ignored before now stops the start and names the variable.
+- **Request size:** clients that send a body in chunks without a `Content-Length` get `411`; browsers, iOS shortcuts, curl and reverse proxies send one.
+- Migration `0012` adds the table `security_events`. New optional setting `SECURITY_LOG_DAYS`.
+- Optional: add `stop_grace_period: 20s` to your `compose.yaml`, as in the new one.
+- The privacy policy should mention the security log: see the updated list in [hosting for others](docs/hosting-for-others.md#operator-information).
+- API: new `GET /v1/admin/security-log` (`before_id`, `limit`, `user_id`, `failures`) and `GET /v1/account/security-log` (`before_id`, `limit`); *My data* has `security_log`. New error codes `request_too_large` and `length_required`; the operator API can answer `429 too_many_attempts`.
+
 ## 0.11.0 – 2026-11-27
 
 Login through your own OpenID Connect provider: Authelia, Authentik, Pocket ID, Keycloak or any other, next to passwords or instead of them.

@@ -99,6 +99,21 @@ docker compose logs --tail=50 app
 
 Database migrations run automatically when the container starts. The image tag `:0` follows all 0.x releases; pin a specific version (e.g. `:0.2.0`) if you prefer to update deliberately. Read the [changelog](../CHANGELOG.md) before updating.
 
+You can update from any release since 0.3.0 straight to the newest one. Every change is tested that way: the 0.3.0 image and the previous release get a group with trips, fuel, an expense and a settlement, then the new image starts on the same volume and everything must still be there and work. Going back to an older release is only possible by restoring a backup.
+
+### Verify the image
+
+From 0.12 on, release images are signed with [cosign](https://docs.sigstore.dev/) by the release workflow (keyless, no key to manage) and carry a build provenance attestation:
+
+```bash
+cosign verify ghcr.io/percuro/fahrma:0.12.0 \
+  --certificate-identity-regexp '^https://github.com/percuro/fahrma/.github/workflows/release.yml@refs/tags/v' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+gh attestation verify oci://ghcr.io/percuro/fahrma:0.12.0 --repo percuro/fahrma
+```
+
+Releases before 0.12 have the attestation but no signature.
+
 ### Upgrading to 0.4
 
 The database is migrated automatically (`0003`). **The oldest active account becomes the admin of the instance**, all others become normal accounts; change roles on the new administration page (profile → *Instance administration*). Invitation links now carry their token after a `#` (`/invite#…`); links created before still work. Accounts deleted from now on stay as an anonymous name in their groups, so balances do not change.
@@ -165,6 +180,20 @@ docker compose exec app python -m app.cli.create_user <name> --reset-password   
 docker compose exec app python -m app.cli.set_role <name> admin                 # emergency exit if no admin is left
 docker compose exec app python -m app.cli.stats                                 # numbers only, no content
 ```
+
+### Security log
+
+Instance admins find a security log on the administration page (tab *Security*): logins and failed logins, wrong passwords when confirming a change, blocks by the rate limits (login, setup token, invitation links, forgotten password, provider login, registration, operator API), new and deleted accounts, changed, set and removed passwords, confirmed and removed e-mail addresses, devices logged out, links with the OpenID Connect provider, roles, deactivations, instance invitations, password-reset links, changed plans and the warnings before unused accounts are deleted. Changes from the command line and from the operator API are marked as such. Filter by account or to failed attempts only.
+
+- IP addresses are stored only shortened (IPv4 /24, IPv6 /48), and only for failed attempts and blocks. A block is logged once, not every refused request.
+- Passwords, tokens and links are never stored, nor usernames that do not exist.
+- The usernames involved are copied, so entries stay readable after an account is deleted.
+- Entries are kept for `SECURITY_LOG_DAYS` (default 180) and then removed.
+- Everyone sees the entries about their own account on the profile page (*Recent security events*), without the names of instance admins, and finds them in *My data*. Group contents and memberships are in each group's own change log instead.
+
+`app.cli.stats` counts logins, failed attempts and blocks of the last 24 hours.
+
+### Deleting accounts
 
 Deleting an account removes its login, devices and name. Its trips and payments stay in its groups under an anonymous name ("Person 12"), also in frozen settlements, so the balances of the others stay correct. Groups without any other member are deleted with it; where it was the last group admin, the longest-standing member takes over.
 

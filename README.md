@@ -4,7 +4,7 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.11 – login through your own OpenID Connect provider, photos of receipts, and everything to host it for others: plans per group, a hand-off to your own billing, unused accounts deleted after a warning. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
+> Status: 0.12 beta – a security log of logins and account changes, updates tested from 0.3.0, signed images; before that, login through your own OpenID Connect provider, photos of receipts, and everything to host it for others. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
@@ -22,7 +22,7 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 - **Login through your own provider** (optional): Authelia, Authentik, Pocket ID, Keycloak or any other OpenID Connect provider, next to passwords or instead of them – for invitations, registration, the first setup and linking an existing account. See [docs/oidc.md](docs/oidc.md).
 - **Optional e-mail:** forgot password, confirmed addresses, invitations by mail, registration with address confirmation. Without it, everything works with links.
 - **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up. Operators can have unused accounts deleted after a warning.
-- **Instance administration:** accounts, roles, invitation and password-reset links – without seeing anybody's trips. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
+- **Instance administration:** accounts, roles, invitation and password-reset links and a security log of logins and account changes – without seeing anybody's trips. Everyone sees their own account's security events. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
 - **Plans per group** for hosting it for others: a free and a paid plan, say, each with its own limits; members see theirs on the group page. fahrma handles no money – you set plans by hand or let your own billing service do it through the [operator API](docs/operator-api.md). A plan that ends never locks anyone out.
 - **German and English**, currency and time zone per group.
 - **Installable web app** for iPhone, Android and desktop, light and dark.
@@ -52,11 +52,13 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 - [Development](docs/development.md): running and testing from source
 - [Design notes](docs/design.md): why it works the way it does
 - [Design language](docs/design-language.md): the look, and the rules behind it
+- [Accessibility](docs/accessibility.md): what is built in, how it is checked, how to report a problem
 
 ## Roadmap
 
 - ~~**0.11** login via OpenID Connect~~ ✓
-- **0.12** beta hardening (with a security log of logins and account changes); **1.0** stable API and configuration
+- ~~**0.12** beta hardening: security log, tested updates, signed images, accessibility~~ ✓
+- **1.0** stable API and configuration
 
 ## Sibling project
 

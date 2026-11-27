@@ -2,7 +2,7 @@
 
 For your own tools around a hosted instance – typically a small billing service that sets a group's plan after payment. It is off unless `OPERATOR_TOKEN` (or `OPERATOR_TOKEN_FILE`) is set; see [configuration](configuration.md#plans).
 
-- **Authentication:** `Authorization: Bearer <OPERATOR_TOKEN>` on every request. Logins and cookies are not accepted, not even an instance admin's, and the CSRF header is not needed. Without the token configured, every route answers `404 operator_api_disabled`; a wrong token gives `401 operator_unauthorized`.
+- **Authentication:** `Authorization: Bearer <OPERATOR_TOKEN>` on every request. Logins and cookies are not accepted, not even an instance admin's, and the CSRF header is not needed. Without the token configured, every route answers `404 operator_api_disabled`; a wrong token gives `401 operator_unauthorized`. After 20 wrong tokens from one address within 15 minutes, that address gets `429 too_many_attempts` for a while, and the block appears in the [security log](self-hosting.md#security-log). Plan changes through the API are in the security log too.
 - **What it sees:** plans, counts and the names of a group's admins – never trips, costs, amounts or settlements.
 - **Where:** under `PUBLIC_URL/api/v1/operator/`. Call it from your server, not from a browser; keep the token out of anything that reaches users.
 
