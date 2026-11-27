@@ -46,6 +46,7 @@ from app.repositories.auth_repository import AuthRepository
 from app.schemas.invitation import InvitationAccept
 from app.services import setup_service
 from app.services.auth_service import USERNAME_PATTERN, AuthService, cookie_settings, utcnow
+from app.services.client_address import client_ip
 from app.services.invitation_service import External, InvitationService
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.oidc_client import Identity, OidcClient, OidcError, get_client, pkce_pair
@@ -57,8 +58,7 @@ STATE_TTL = timedelta(minutes=10)
 # Where the web app may be sent back to after link/reauth
 RETURN_PATHS = ("/", "/profile", "/admin")
 # Starts and failed callbacks per IP address (each start writes a row)
-oidc_rate_limiter = LoginRateLimiter()
-oidc_rate_limiter.account_limit = oidc_rate_limiter.ip_limit = 30
+oidc_rate_limiter = LoginRateLimiter("oidc", account_limit=30, ip_limit=30)
 
 
 def require_settings() -> OidcSettings:
@@ -80,10 +80,6 @@ def hash_state(state: str) -> str:
 def _cookie_path(request: Request) -> str:
     # The API is mounted under /api; the callback lives at <root>/v1/auth/oidc/callback
     return f"{request.scope.get('root_path', '')}/v1/auth/oidc"
-
-
-def _client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 def suggest_username(identity: Identity) -> str:
@@ -127,7 +123,7 @@ class OidcService:
     ) -> str:
         """Remember what to do after the provider and return the URL to send the browser to."""
         settings = require_settings()
-        ip_address = _client_ip(request)
+        ip_address = client_ip(request)
         oidc_rate_limiter.check(ip_address, ip_address)
         oidc_rate_limiter.record_failure(ip_address, ip_address)
         client = client_for(settings)
@@ -208,7 +204,7 @@ class OidcService:
         except OidcFlowError as exc:
             self.db.rollback()
             if exc.code in COUNTED_ERRORS:
-                ip_address = _client_ip(request)
+                ip_address = client_ip(request)
                 oidc_rate_limiter.record_failure(ip_address, ip_address)
             response.headers["Location"] = f"{get_public_url()}{exc.page}#error={exc.code}"
             return response

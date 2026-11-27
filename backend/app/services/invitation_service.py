@@ -45,6 +45,7 @@ from app.schemas.invitation import (
 )
 from app.services import mail_texts
 from app.services.auth_service import AccountError, AuthService, normalize_username, require_password_login, utcnow
+from app.services.client_address import client_ip
 from app.services.limits import check_new_group, check_new_member
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.mail import Mail, check_account_quota, require_mail, send_later
@@ -59,14 +60,10 @@ KEEP_FINISHED = timedelta(days=30)
 # Links an instance admin manages (the others belong to the person)
 ADMIN_PURPOSES = (PURPOSE_SIGNUP, PURPOSE_PASSWORD_RESET)
 # Wrong tokens per IP address: 20 in 15 minutes (the limiter is keyed by the IP twice)
-invitation_rate_limiter = LoginRateLimiter()
-invitation_rate_limiter.account_limit = invitation_rate_limiter.ip_limit
+invitation_rate_limiter = LoginRateLimiter("invitation", account_limit=20, ip_limit=20)
 # "Forgot password": 10 requests per IP address and 3 mails per account per hour
-reset_ip_limiter = LoginRateLimiter(window_seconds=60 * 60)
-reset_ip_limiter.account_limit = reset_ip_limiter.ip_limit = 10
-reset_account_limiter = LoginRateLimiter(window_seconds=60 * 60)
-reset_account_limiter.account_limit = 3
-reset_account_limiter.ip_limit = 10**9
+reset_ip_limiter = LoginRateLimiter("reset", window_seconds=60 * 60, account_limit=10, ip_limit=10)
+reset_account_limiter = LoginRateLimiter("reset_mail", window_seconds=60 * 60, account_limit=3, ip_limit=10**9)
 
 
 def invalid() -> AppError:
@@ -75,10 +72,6 @@ def invalid() -> AppError:
 
 def email_taken() -> AppError:
     return AppError(status.HTTP_409_CONFLICT, "email_taken", "This address belongs to another account")
-
-
-def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 def new_token() -> tuple[str, str]:
@@ -123,7 +116,7 @@ class InvitationService:
     ) -> InvitationCreated:
         if email:
             require_mail()
-            check_account_quota(admin.id, client_ip(request) if request else "unknown")
+            check_account_quota(admin.id, client_ip(request))
         now = utcnow()
         invitation = Invitation(
             purpose=PURPOSE_SIGNUP,

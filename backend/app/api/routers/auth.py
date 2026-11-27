@@ -21,13 +21,13 @@ from app.schemas.auth import (
 )
 from app.services import group_service, setup_service
 from app.services.auth_service import AccountError, AuthService, require_password_login
+from app.services.client_address import client_ip
 from app.services.invitation_service import InvitationService
 from app.services.login_rate_limiter import LoginRateLimiter, login_rate_limiter
 
 router = APIRouter()
 # Every registration attempt counts (not only failures): at most 5 per IP address and hour
-register_rate_limiter = LoginRateLimiter(window_seconds=60 * 60)
-register_rate_limiter.ip_limit = 5
+register_rate_limiter = LoginRateLimiter("register", window_seconds=60 * 60, ip_limit=5)
 
 
 def me_response(db: Session, user, today: date) -> MeRead:
@@ -64,7 +64,7 @@ def login(
     today: date = Depends(get_today),
 ):
     username = login_in.username.lower()
-    ip_address = request.client.host if request.client else "unknown"
+    ip_address = client_ip(request)
     login_rate_limiter.check(username, ip_address)
     try:
         user = AuthService(AuthRepository(db)).login(login_in, request, response)
@@ -106,7 +106,7 @@ def register(
     with_mail = mail_enabled()
     if with_mail and not data.email:
         raise AppError(status.HTTP_422_UNPROCESSABLE_CONTENT, "email_required", "Please enter your e-mail address")
-    ip_address = request.client.host if request.client else "unknown"
+    ip_address = client_ip(request)
     register_rate_limiter.check(ip_address, ip_address)
     register_rate_limiter.record_failure(ip_address, ip_address)
     if with_mail:

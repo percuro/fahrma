@@ -24,6 +24,7 @@ from app.models.user import AUTH_OIDC, NO_PASSWORD, ROLE_USER, OidcIdentity, Use
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import DeletionPreview, SessionRead
 from app.services.auth_service import AccountError, AuthService, clear_session_cookie, require_password_login, utcnow
+from app.services.client_address import client_ip
 from app.services.devices import describe_user_agent
 from app.services.group_service import delete_group_data
 from app.services.login_rate_limiter import login_rate_limiter
@@ -39,10 +40,6 @@ REAUTH_WINDOW = timedelta(minutes=10)
 def anonymous_name(user_id: int) -> str:
     """Name of a deleted account; "Person" reads the same in German and English."""
     return f"Person {user_id}"
-
-
-def client_ip(request: Request) -> str:
-    return request.client.host if request.client else "unknown"
 
 
 class AccountService:

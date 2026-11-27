@@ -10,7 +10,7 @@ from app.services.login_rate_limiter import LoginRateLimiter
 
 class LoginRateLimiterTest(unittest.TestCase):
     def test_blocks_account_after_five_failures(self):
-        limiter = LoginRateLimiter()
+        limiter = LoginRateLimiter("test")
         for _ in range(5):
             limiter.check("alex", "192.0.2.1")
             limiter.record_failure("alex", "192.0.2.1")
@@ -23,8 +23,13 @@ class LoginRateLimiterTest(unittest.TestCase):
         limiter.record_success("alex")
         limiter.check("alex", "192.0.2.1")
 
+    def test_reports_the_block_once(self):
+        limiter = LoginRateLimiter("test", account_limit=3)
+        reported = [limiter.record_failure("alex", "192.0.2.1") for _ in range(5)]
+        self.assertEqual(reported, [False, False, True, False, False])
+
     def test_blocks_ip_after_twenty_failures(self):
-        limiter = LoginRateLimiter()
+        limiter = LoginRateLimiter("test")
         for i in range(20):
             limiter.record_failure(f"user{i}", "192.0.2.9")
         with self.assertRaises(HTTPException):

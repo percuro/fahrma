@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from app.api.routers.setup import setup_rate_limiter
 from app.services import setup_service
@@ -55,6 +56,13 @@ class SetupTest(unittest.TestCase):
         for _ in range(5):
             self.post(token="wrong")
         self.assertEqual(self.post().status_code, 429)
+
+    def test_rate_limit_is_per_ip(self):
+        """Wrong tokens from one address must not lock out the operator at another one."""
+        for _ in range(5):
+            self.post(token="wrong")
+        with mock.patch("app.api.routers.setup.client_ip", return_value="192.0.2.7"):
+            self.assertEqual(self.post().status_code, 200)
 
     def test_no_token_issued_means_no_setup(self):
         setup_service.clear_token()

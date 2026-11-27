@@ -26,8 +26,9 @@ from app.schemas.plans import BillingLink
 from app.services import audit_service, group_import, group_service
 from app.services.access import GroupContext, load_group_context
 from app.services.billing_link import billing_link
+from app.services.client_address import client_ip
 from app.services.group_export import export_group
-from app.services.invitation_service import InvitationService, client_ip
+from app.services.invitation_service import InvitationService
 from app.services.mail import check_account_quota, require_mail
 from app.services.plans import effective_plan
 

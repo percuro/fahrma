@@ -26,9 +26,7 @@ logger = logging.getLogger(__name__)
 SMTP_TIMEOUT_SECONDS = 20
 
 # Mails an account can trigger (invitations, address confirmation): 20 per hour
-account_mail_limiter = LoginRateLimiter(window_seconds=60 * 60)
-account_mail_limiter.account_limit = 20
-account_mail_limiter.ip_limit = 60
+account_mail_limiter = LoginRateLimiter("account_mail", window_seconds=60 * 60, account_limit=20, ip_limit=60)
 
 
 @dataclass(frozen=True)

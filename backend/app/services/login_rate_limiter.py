@@ -10,10 +10,12 @@ from app.errors import AppError
 class LoginRateLimiter:
     """In-memory limit of failed logins per account and per client address (one process only)."""
 
-    def __init__(self, window_seconds: int = 15 * 60):
+    def __init__(self, name: str, *, window_seconds: int = 15 * 60, account_limit: int = 5, ip_limit: int = 20):
+        # The name appears in the security log when the limiter blocks someone
+        self.name = name
         self.window_seconds = window_seconds
-        self.account_limit = 5
-        self.ip_limit = 20
+        self.account_limit = account_limit
+        self.ip_limit = ip_limit
         self._attempts: dict[str, deque[float]] = defaultdict(deque)
         self._lock = Lock()
 
@@ -31,11 +33,15 @@ class LoginRateLimiter:
                     retry_after_seconds=self.window_seconds,
                 )
 
-    def record_failure(self, username: str, ip_address: str) -> None:
+    def record_failure(self, username: str, ip_address: str) -> bool:
+        """Count a failure; True exactly when it reaches a limit, so a block is reported once."""
         now = monotonic()
         with self._lock:
-            self._active(f"account:{username.lower()}", now).append(now)
-            self._active(f"ip:{ip_address}", now).append(now)
+            account_attempts = self._active(f"account:{username.lower()}", now)
+            ip_attempts = self._active(f"ip:{ip_address}", now)
+            account_attempts.append(now)
+            ip_attempts.append(now)
+            return len(account_attempts) == self.account_limit or len(ip_attempts) == self.ip_limit
 
     def record_success(self, username: str) -> None:
         with self._lock:
@@ -53,4 +59,4 @@ class LoginRateLimiter:
         return attempts
 
 
-login_rate_limiter = LoginRateLimiter()
+login_rate_limiter = LoginRateLimiter("login")
