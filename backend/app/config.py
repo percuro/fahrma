@@ -45,19 +45,36 @@ def _env(name: str, default: str = "") -> str:
     return default
 
 
+TRUE_VALUES = {"1", "true", "yes", "on"}
+FALSE_VALUES = {"0", "false", "no", "off"}
+COOKIE_SAMESITE_VALUES = ("lax", "strict", "none")
+
+
 def env_bool(name: str, default: bool = False) -> bool:
+    """An unset or empty variable is the default; anything but on/off values stops the start."""
     value = os.getenv(name)
     if value is None or not value.strip():
         return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
+    value = value.strip().lower()
+    if value in TRUE_VALUES:
+        return True
+    if value in FALSE_VALUES:
+        return False
+    raise ConfigError(f"{name} must be true or false (also on/off, yes/no, 1/0), got {value!r}")
 
 
 def env_positive_int(name: str, default: int) -> int:
-    try:
-        value = int(os.getenv(name, str(default)))
-    except ValueError:
+    """An unset or empty variable is the default; anything but a whole number above 0 stops the start."""
+    value = os.getenv(name, "").strip()
+    if not value:
         return default
-    return value if value > 0 else default
+    try:
+        number = int(value)
+    except ValueError:
+        number = 0
+    if number <= 0:
+        raise ConfigError(f"{name} must be a whole number above 0, got {value!r}")
+    return number
 
 
 def get_database_url() -> str:
@@ -98,6 +115,23 @@ def cookie_secure() -> bool:
 
 def api_docs_enabled() -> bool:
     return env_bool("API_DOCS")
+
+
+def get_cookie_samesite() -> str:
+    value = os.getenv("COOKIE_SAMESITE", "").strip().lower()
+    if not value:
+        return "lax"
+    if value not in COOKIE_SAMESITE_VALUES:
+        raise ConfigError(f"COOKIE_SAMESITE must be one of lax, strict or none, got {value!r}")
+    return value
+
+
+def get_session_idle_minutes() -> int:
+    return env_positive_int("SESSION_IDLE_MINUTES", 30 * 24 * 60)
+
+
+def get_session_absolute_hours() -> int:
+    return env_positive_int("SESSION_ABSOLUTE_HOURS", 90 * 24)
 
 
 def get_default_timezone_name() -> str:
@@ -565,7 +599,7 @@ class PushSettings:
 
 def get_push_settings() -> PushSettings | None:
     """Web Push is on by default (it needs no external account); PUSH=off turns it off."""
-    if os.getenv("PUSH", "").strip().lower() in {"0", "false", "no", "off"}:
+    if not env_bool("PUSH", True):
         return None
     subject = os.getenv("VAPID_SUBJECT", "").strip() or get_public_url()
     if not subject.startswith(("mailto:", "https://", "http://")):
@@ -591,6 +625,15 @@ def push_enabled() -> bool:
 def validate() -> None:
     """Fail fast at startup with a readable message instead of on the first request."""
     get_public_url()
+    csrf_enabled()
+    cookie_secure()
+    api_docs_enabled()
+    get_cookie_samesite()
+    get_session_idle_minutes()
+    get_session_absolute_hours()
+    get_invite_expiry_days()
+    password_login_enabled()
+    receipts_enabled()
     get_default_timezone()
     get_registration_mode()
     get_operator_links()

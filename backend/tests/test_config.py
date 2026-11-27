@@ -87,6 +87,43 @@ class ConfigTest(unittest.TestCase):
             with self.env(**env, OIDC_CLIENT_SECRET_FILE=missing), self.assertRaises(config.ConfigError):
                 config.get_oidc_settings()
 
+    def test_invalid_switches_and_numbers_stop_the_start(self):
+        """A typo must not silently turn a protection off or a limit back to its default."""
+        cases = {
+            "CSRF_PROTECTION": "ture",
+            "COOKIE_SECURE": "ja",
+            "API_DOCS": "enabled",
+            "PASSWORD_LOGIN": "nein",
+            "RECEIPTS": "maybe",
+            "PUSH": "aus",
+            "SESSION_IDLE_MINUTES": "30m",
+            "SESSION_ABSOLUTE_HOURS": "0",
+            "INVITE_EXPIRY_DAYS": "-1",
+            "COOKIE_SAMESITE": "lox",
+        }
+        for name, value in cases.items():
+            with self.subTest(name=name), self.env(PUBLIC_URL="https://cars.example.org", **{name: value}):
+                with self.assertRaises(config.ConfigError) as caught:
+                    config.validate()
+                self.assertIn(name, str(caught.exception))
+
+    def test_switch_spellings_and_empty_values(self):
+        for value, expected in (("on", True), ("Yes", True), ("1", True), (" TRUE ", True)):
+            with self.env(API_DOCS=value):
+                self.assertIs(config.api_docs_enabled(), expected)
+        for value in ("off", "No", "0", "false"):
+            with self.env(CSRF_PROTECTION=value):
+                self.assertFalse(config.csrf_enabled())
+        with self.env(CSRF_PROTECTION="", SESSION_IDLE_MINUTES="", COOKIE_SAMESITE=""):
+            self.assertTrue(config.csrf_enabled())
+            self.assertEqual(config.get_session_idle_minutes(), 30 * 24 * 60)
+            self.assertEqual(config.get_cookie_samesite(), "lax")
+        with self.env(COOKIE_SAMESITE="Strict", SESSION_ABSOLUTE_HOURS="12"):
+            self.assertEqual(config.get_cookie_samesite(), "strict")
+            self.assertEqual(config.get_session_absolute_hours(), 12)
+        with self.env(PUBLIC_URL="https://cars.example.org", PUSH="off"):
+            self.assertIsNone(config.get_push_settings())
+
 
 if __name__ == "__main__":
     unittest.main()
