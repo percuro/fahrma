@@ -21,6 +21,7 @@ from app.db.database import SessionLocal
 from app.main import app as api
 from app.middleware.security_headers import add_security_headers
 from app.services import inactive_accounts, notification_service, receipt_store, setup_service
+from app.services.background import ThreadRuns
 
 if not logging.getLogger().handlers:
     logging.basicConfig(
@@ -75,22 +76,27 @@ async def lifespan(_app: FastAPI):
     reminders = asyncio.create_task(remind()) if config.push_enabled() else None
     cleanup = asyncio.create_task(delete_inactive()) if config.get_inactive_delete_months() else None
     sweep = asyncio.create_task(sweep_receipts()) if config.receipts_enabled() else None
-    yield
-    for task in (reminders, cleanup, sweep):
-        if task is not None:
-            task.cancel()
+    try:
+        yield
+    finally:
+        for task in (reminders, cleanup, sweep):
+            if task is not None:
+                task.cancel()
+        # A round that is busy (e.g. deleting an account) finishes instead of stopping halfway
+        await asyncio.gather(*(runs.wait() for runs in (REMINDER_RUNS, INACTIVE_RUNS, SWEEP_RUNS)))
 
 
 # Reminders by Web Push: one round a minute, in a thread so requests never wait for it.
 # Exactly one instance runs (SQLite), so there is no second loop to coordinate with.
 REMINDER_INTERVAL_SECONDS = 60
+REMINDER_RUNS = ThreadRuns("reminder")
 
 
 async def remind() -> None:
     while True:
         await asyncio.sleep(REMINDER_INTERVAL_SECONDS)
         try:
-            await asyncio.to_thread(notification_service.run_scheduled)
+            await REMINDER_RUNS.run(notification_service.run_scheduled)
         except OperationalError:
             logger.warning("Reminders skipped: database not ready")
         except Exception:
@@ -101,13 +107,14 @@ async def remind() -> None:
 # a few minutes, so a restart loop never runs it in quick succession)
 INACTIVE_FIRST_DELAY_SECONDS = 5 * 60
 INACTIVE_INTERVAL_SECONDS = 60 * 60
+INACTIVE_RUNS = ThreadRuns("inactive accounts")
 
 
 async def delete_inactive() -> None:
     await asyncio.sleep(INACTIVE_FIRST_DELAY_SECONDS)
     while True:
         try:
-            await asyncio.to_thread(inactive_accounts.run_scheduled, SessionLocal)
+            await INACTIVE_RUNS.run(lambda: inactive_accounts.run_scheduled(SessionLocal))
         except OperationalError:
             logger.warning("Inactive accounts skipped: database not ready")
         except Exception:
@@ -119,13 +126,14 @@ async def delete_inactive() -> None:
 # committing, or a deletion interrupted after its commit), once an hour
 RECEIPT_SWEEP_FIRST_DELAY_SECONDS = 10 * 60
 RECEIPT_SWEEP_INTERVAL_SECONDS = 60 * 60
+SWEEP_RUNS = ThreadRuns("receipt cleanup")
 
 
 async def sweep_receipts() -> None:
     await asyncio.sleep(RECEIPT_SWEEP_FIRST_DELAY_SECONDS)
     while True:
         try:
-            await asyncio.to_thread(receipt_store.run_sweep, SessionLocal)
+            await SWEEP_RUNS.run(lambda: receipt_store.run_sweep(SessionLocal))
         except OperationalError:
             logger.warning("Receipt cleanup skipped: database not ready")
         except Exception:
