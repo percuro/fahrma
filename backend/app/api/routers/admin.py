@@ -4,6 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query, Request, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import require_admin
+from app.config import get_security_log_days
 from app.db.database import get_db
 from app.models.user import User
 from app.repositories.auth_repository import AuthRepository
@@ -120,6 +121,7 @@ def list_security_log(
             for event in events
         ],
         next_before_id=events[-1].id if more else None,
+        retention_days=get_security_log_days(),
     )
 
 

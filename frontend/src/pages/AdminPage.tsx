@@ -11,23 +11,39 @@ import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
 import { useOidcLabel } from '../hooks/useOidcLabel';
 import { useI18n, useT } from '../i18n';
+import { Tabs } from '../components/Tabs';
+import { AdminSecurityLog } from './SecurityLog';
 
 const USERS_KEY = ['admin', 'users'] as const;
 const INVITATIONS_KEY = ['admin', 'invitations'] as const;
 const GROUPS_KEY = ['admin', 'groups'] as const;
+const ADMIN_TABS = ['accounts', 'groups', 'invitations', 'security'] as const;
 
 /** Instance administration: accounts and invitations; never group contents. */
 export function AdminPage() {
   const t = useT();
   const me = useSession();
   if (me.role !== 'admin') return <Navigate to="/profile" replace />;
+  const labels = {
+    accounts: t.admin.accounts,
+    groups: t.admin.groupsTitle,
+    invitations: t.admin.tabInvitations,
+    security: t.admin.tabSecurity,
+  };
   return (
     <>
       <h1>{t.admin.title}</h1>
       <p className="subtle">{t.admin.intro}</p>
-      <Accounts />
-      <Groups />
-      <Invitations />
+      <Tabs id="admin" tabs={ADMIN_TABS} labels={labels} label={t.admin.tabs}>
+        {(tab) => (
+          <>
+            {tab === 'accounts' && <Accounts />}
+            {tab === 'groups' && <Groups />}
+            {tab === 'invitations' && <Invitations />}
+            {tab === 'security' && <AdminSecurityLog />}
+          </>
+        )}
+      </Tabs>
     </>
   );
 }

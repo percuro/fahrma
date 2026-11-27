@@ -24,6 +24,8 @@ class SecurityEventPage(BaseModel):
     events: list[SecurityEventRead]
     # Pass as before_id for the next (older) page; None = no older entries
     next_before_id: int | None
+    # SECURITY_LOG_DAYS: how long entries are kept
+    retention_days: int
 
 
 class OwnSecurityEventRead(BaseModel):

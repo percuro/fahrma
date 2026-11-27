@@ -461,3 +461,41 @@ export interface NotificationsState {
   this_device: boolean;
   devices: number;
 }
+
+/** Security log (since 0.12): logins and changes to accounts */
+export type SecurityDetails = Record<string, string | number | boolean | null>;
+
+export interface SecurityEvent {
+  id: number;
+  created_at: string;
+  event: string;
+  actor_user_id: number | null;
+  actor_username: string | null;
+  target_user_id: number | null;
+  target_username: string | null;
+  /** Only for failed attempts and blocks, shortened: IPv4 /24, IPv6 /48 */
+  ip_prefix: string | null;
+  details: SecurityDetails;
+}
+
+export interface SecurityEventPage {
+  events: SecurityEvent[];
+  next_before_id: number | null;
+  /** SECURITY_LOG_DAYS: how long entries are kept */
+  retention_days: number;
+}
+
+/** An entry about the own account; an instance admin who acted stays unnamed */
+export interface OwnSecurityEvent {
+  id: number;
+  created_at: string;
+  event: string;
+  actor: 'self' | 'admin' | null;
+  ip_prefix: string | null;
+  details: SecurityDetails;
+}
+
+export interface OwnSecurityEventPage {
+  events: OwnSecurityEvent[];
+  next_before_id: number | null;
+}

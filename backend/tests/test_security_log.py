@@ -192,7 +192,7 @@ class ViewsTest(SecurityLogTestCase):
         for _ in range(3):
             remote.post("/v1/auth/login", json={"username": "sam", "password": "falsch-falsch"})
         page = self.root.get("/v1/admin/security-log", params={"limit": 2}).json()
-        self.assertEqual(len(page["events"]), 2)
+        self.assertEqual((len(page["events"]), page["retention_days"]), (2, 180))
         self.assertIsNotNone(page["next_before_id"])
         older = self.root.get("/v1/admin/security-log", params={"before_id": page["next_before_id"]}).json()
         self.assertTrue(all(event["id"] < page["next_before_id"] for event in older["events"]))
@@ -357,3 +357,10 @@ class PlanEventsTest(HostingTestCase):
                 (None, {**group, "by": "operator", "plan": None, "until": None}),
             ],
         )
+
+
+class OwnViewOfAdminsTest(HostingTestCase):
+    def test_admin_work_is_not_in_the_own_list(self):
+        self.set_plan("plus")
+        own = self.root.get("/v1/account/security-log").json()["events"]
+        self.assertEqual({event["event"] for event in own}, {"auth.login", "account.created"})

@@ -47,7 +47,7 @@ test('a group on a small plan: what it shows, what it refuses, where admins chan
 
 test('instance admins see groups with their plan and change it', async ({ page, request }) => {
   const { group } = await createGroupWithCar(request);
-  await page.goto('/admin');
+  await page.goto('/admin?tab=groups');
   const section = page.getByRole('region', { name: 'Gruppen' });
   const row = section.getByRole('listitem').filter({ hasText: `#${group.id}` });
   await expect(row).toContainText('1 Mitglied · 1 Auto');

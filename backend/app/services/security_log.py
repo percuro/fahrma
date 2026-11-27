@@ -137,16 +137,9 @@ def details_of(event: SecurityEvent) -> dict[str, Any]:
 
 
 def own_events(db: Session, user: User, *, before_id: int | None = None, limit: int = 50) -> list[SecurityEvent]:
-    """The entries about the account itself; what an admin did to other accounts is not among them."""
-    query = (
-        select(SecurityEvent)
-        .where(
-            (SecurityEvent.target_user_id == user.id)
-            | ((SecurityEvent.actor_user_id == user.id) & SecurityEvent.target_user_id.is_(None))
-        )
-        .order_by(SecurityEvent.id.desc())
-        .limit(limit)
-    )
+    """The entries about the account itself; what an admin did elsewhere (other accounts, plans) is not here."""
+    query = select(SecurityEvent).where(SecurityEvent.target_user_id == user.id).order_by(SecurityEvent.id.desc())
+    query = query.limit(limit)
     if before_id is not None:
         query = query.where(SecurityEvent.id < before_id)
     return list(db.scalars(query))
