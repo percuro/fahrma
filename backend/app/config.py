@@ -178,6 +178,11 @@ def get_invite_expiry_days() -> int:
     return env_positive_int("INVITE_EXPIRY_DAYS", 7)
 
 
+def get_security_log_days() -> int:
+    """How long the security log keeps an entry."""
+    return env_positive_int("SECURITY_LOG_DAYS", 180)
+
+
 def _optional_url(name: str) -> str | None:
     value = os.getenv(name, "").strip()
     if not value:
@@ -632,6 +637,7 @@ def validate() -> None:
     get_session_idle_minutes()
     get_session_absolute_hours()
     get_invite_expiry_days()
+    get_security_log_days()
     password_login_enabled()
     receipts_enabled()
     get_default_timezone()

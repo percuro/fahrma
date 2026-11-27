@@ -19,7 +19,7 @@ from app.schemas.auth import (
     RegisterRequest,
     RegistrationPending,
 )
-from app.services import group_service, setup_service
+from app.services import group_service, security_log, setup_service
 from app.services.auth_service import AccountError, AuthService, require_password_login
 from app.services.client_address import client_ip
 from app.services.invitation_service import InvitationService
@@ -70,7 +70,13 @@ def login(
         user = AuthService(AuthRepository(db)).login(login_in, request, response)
     except AppError as exc:
         if exc.status_code == status.HTTP_401_UNAUTHORIZED:
-            login_rate_limiter.record_failure(username, ip_address)
+            # Only for an existing account: a mistyped username is never stored
+            target = AuthRepository(db).get_user_by_username(username)
+            if target is not None and (target.is_deleted or target.placeholder):
+                target = None
+            if target is not None:
+                security_log.record(db, "auth.login_failed", target=target, request=request)
+            security_log.count_failure(db, login_rate_limiter, username, request, target=target)
         raise
     login_rate_limiter.record_success(username)
     return me_response(db, user, today)
@@ -108,7 +114,7 @@ def register(
         raise AppError(status.HTTP_422_UNPROCESSABLE_CONTENT, "email_required", "Please enter your e-mail address")
     ip_address = client_ip(request)
     register_rate_limiter.check(ip_address, ip_address)
-    register_rate_limiter.record_failure(ip_address, ip_address)
+    security_log.count_failure(db, register_rate_limiter, ip_address, request)
     if with_mail:
         InvitationService(db, background).start_registration(data, request)
         return JSONResponse(
@@ -116,7 +122,7 @@ def register(
         )
     service = AuthService(AuthRepository(db))
     try:
-        user = service.create_user(data.username, data.password, data.display_name, locale=data.locale)
+        user = service.create_user(data.username, data.password, data.display_name, locale=data.locale, via="register")
     except AccountError as exc:
         raise exc.to_http() from exc
     service.start_session(user, request, response)

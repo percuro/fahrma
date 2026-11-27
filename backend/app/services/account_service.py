@@ -23,6 +23,7 @@ from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import AUTH_OIDC, NO_PASSWORD, ROLE_USER, OidcIdentity, User
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import DeletionPreview, SessionRead
+from app.services import security_log
 from app.services.auth_service import AccountError, AuthService, clear_session_cookie, require_password_login, utcnow
 from app.services.client_address import client_ip
 from app.services.devices import describe_user_agent
@@ -78,7 +79,8 @@ class AccountService:
         ip_address = client_ip(request)
         login_rate_limiter.check(user.username, ip_address)
         if not AuthService.verify_password(password, user.password_hash):
-            login_rate_limiter.record_failure(user.username, ip_address)
+            security_log.record(self.db, "auth.confirm_failed", actor=user, target=user, request=request)
+            security_log.count_failure(self.db, login_rate_limiter, user.username, request, target=user)
             # 403, not 401: the session is fine, only the confirmation failed
             raise AppError(status.HTTP_403_FORBIDDEN, "wrong_password", "The password is wrong")
         login_rate_limiter.record_success(user.username)
@@ -91,7 +93,9 @@ class AccountService:
             AuthService.check_password(new)
         except AccountError as exc:
             raise exc.to_http() from exc
+        event = "account.password_changed" if user.has_password else "account.password_set"
         user.password_hash = AuthService.hash_password(new)
+        security_log.record(self.db, event, actor=user, target=user, commit=False)
         self.db.commit()
         # Every other device has to log in again with the new password
         self.repository.delete_sessions(user.id, keep_session_id=session_id)
@@ -113,6 +117,7 @@ class AccountService:
             )
         self.require_fresh_provider_login(user, session_id)
         user.password_hash = NO_PASSWORD
+        security_log.record(self.db, "account.password_removed", actor=user, target=user, commit=False)
         self.db.commit()
         self.repository.delete_sessions(user.id, keep_session_id=session_id)
 
@@ -133,10 +138,15 @@ class AccountService:
         session = self.repository.get_session_for_user(session_id, user.id)
         if session is None:
             raise AppError(status.HTTP_404_NOT_FOUND, "session_not_found", "Session not found")
+        security_log.record(self.db, "account.sessions_revoked", actor=user, target=user, commit=False, count=1)
         self.repository.delete_session(session)
 
     def revoke_other_sessions(self, user: User, current_session_id: int) -> int:
-        return self.repository.delete_sessions(user.id, keep_session_id=current_session_id)
+        count = self.repository.delete_sessions(user.id, keep_session_id=current_session_id, commit=False)
+        if count:
+            security_log.record(self.db, "account.sessions_revoked", actor=user, target=user, commit=False, count=count)
+        self.db.commit()
+        return count
 
     # --- Deletion -----------------------------------------------------------
 
@@ -163,10 +173,10 @@ class AccountService:
         self, user: User, password: str | None, request: Request, response: Response, session_id: int
     ) -> None:
         self.confirm(user, password, request, session_id)
-        self.delete(user)
+        self.delete(user, actor=user, by="self")
         clear_session_cookie(response)
 
-    def delete(self, user: User) -> None:
+    def delete(self, user: User, *, actor: User | None = None, by: str = "self") -> None:
         """Delete an account; the bookings of its groups stay under an anonymous name.
 
         - Groups without another active member are deleted completely.
@@ -175,6 +185,8 @@ class AccountService:
           disappears from the frozen settlement snapshots.
         """
         self.ensure_not_last_admin(user)
+        # Before the username is removed: the entry keeps it (for SECURITY_LOG_DAYS)
+        security_log.record(self.db, "account.deleted", actor=actor, target=user, commit=False, by=by)
         deleted, handover, _kept = self._deletion_plan(user)
         for group in deleted:
             delete_group_data(self.db, group.id)
@@ -331,6 +343,7 @@ class AccountService:
                 )
             ),
             "notifications": notification_export(self.db, user),
+            "security_log": security_log.export_rows(self.db, user),
             "reservations": rows(
                 select(Reservation)
                 .where(or_(Reservation.user_id == uid, Reservation.created_by == uid))

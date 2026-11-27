@@ -9,6 +9,7 @@ from app.models.group import Membership
 from app.models.user import ROLE_USER, User
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.admin import AdminUserRead, AdminUserUpdate
+from app.services import security_log
 from app.services.account_service import AccountService
 from app.services.inactive_accounts import deletion_day
 
@@ -44,9 +45,14 @@ class AdminService:
             raise AppError(status.HTTP_409_CONFLICT, "self_deactivate", "You cannot deactivate your own account")
         if demote or deactivate:
             self.accounts.ensure_not_last_admin(user)
-        if data.role is not None:
+        if data.role is not None and data.role != user.role:
+            security_log.record(
+                self.db, "admin.role_changed", actor=admin, target=user, commit=False, before=user.role, after=data.role
+            )
             user.role = data.role
-        if data.is_active is not None:
+        if data.is_active is not None and data.is_active != user.is_active:
+            event = "admin.reactivated" if data.is_active else "admin.deactivated"
+            security_log.record(self.db, event, actor=admin, target=user, commit=False)
             user.is_active = data.is_active
         self.db.commit()
         if deactivate:
@@ -60,7 +66,7 @@ class AdminService:
         if user.id == admin.id:
             # Deleting yourself needs your password: use DELETE /account
             raise AppError(status.HTTP_409_CONFLICT, "self_delete", "Delete your own account on the profile page")
-        self.accounts.delete(user)
+        self.accounts.delete(user, actor=admin, by="admin")
 
     def _group_count(self, user_id: int) -> int:
         return (

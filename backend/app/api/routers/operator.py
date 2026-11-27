@@ -15,16 +15,25 @@ from app.errors import AppError
 from app.models.group import ROLE_ADMIN, Group, Membership
 from app.models.user import User
 from app.schemas.plans import BillingTokenCheck, BillingTokenRead, OperatorGroupRead, PlanUpdate
+from app.services import security_log
 from app.services.billing_link import verify_token
+from app.services.client_address import client_ip
+from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.plans import get_group, list_groups, operator_group_read, set_plan
 
+# Wrong tokens per IP address: 20 in 15 minutes, then 429 (the limiter is keyed by the IP twice)
+operator_rate_limiter = LoginRateLimiter("operator", account_limit=20, ip_limit=20)
 
-def require_operator(request: Request) -> str:
+
+def require_operator(request: Request, db: Session = Depends(get_db)) -> str:
     token = get_operator_token()
     if token is None:
         raise AppError(status.HTTP_404_NOT_FOUND, "operator_api_disabled", "The operator API is not enabled")
+    ip_address = client_ip(request)
+    operator_rate_limiter.check(ip_address, ip_address)
     scheme, _, given = request.headers.get("Authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not hmac.compare_digest(given.strip().encode(), token.encode()):
+        security_log.count_failure(db, operator_rate_limiter, ip_address, request)
         raise AppError(status.HTTP_401_UNAUTHORIZED, "operator_unauthorized", "Wrong or missing operator token")
     return token
 
@@ -46,7 +55,7 @@ def read_group(group_id: int, db: Session = Depends(get_db)):
 @router.put("/groups/{group_id}/plan", response_model=OperatorGroupRead)
 def update_plan(group_id: int, data: PlanUpdate, db: Session = Depends(get_db)):
     group = get_group(db, group_id)
-    set_plan(db, group, data.plan, data.until, data.note)
+    set_plan(db, group, data.plan, data.until, data.note, by="operator")
     db.commit()
     return operator_group_read(db, group)
 

@@ -15,7 +15,7 @@ from app.models.user import ROLE_ADMIN
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import MeRead
 from app.schemas.oidc import OidcRedirect, SetupOidcStart
-from app.services import setup_service
+from app.services import security_log, setup_service
 from app.services.auth_service import AccountError, AuthService, normalize_username, require_password_login
 from app.services.client_address import client_ip
 from app.services.login_rate_limiter import LoginRateLimiter
@@ -47,7 +47,8 @@ def _check_token(token: str, request: Request, db: Session) -> None:
     if not setup_service.needs_setup(db):
         raise _already_done()
     if not setup_service.token_matches(token.strip()):
-        setup_rate_limiter.record_failure(ip_address, ip_address)
+        security_log.record(db, "setup.failed", request=request)
+        security_log.count_failure(db, setup_rate_limiter, ip_address, request)
         raise AppError(status.HTTP_403_FORBIDDEN, "setup_token_invalid", "Wrong setup token")
 
 
@@ -71,7 +72,7 @@ def run_setup(
         if not setup_service.needs_setup(db):
             raise _already_done()
         try:
-            user = service.create_user(data.username, data.password, data.display_name, role=ROLE_ADMIN)
+            user = service.create_user(data.username, data.password, data.display_name, role=ROLE_ADMIN, via="setup")
         except AccountError as exc:
             raise exc.to_http() from exc
     setup_service.clear_token()

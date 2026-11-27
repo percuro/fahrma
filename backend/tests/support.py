@@ -13,6 +13,8 @@ from sqlalchemy.pool import StaticPool
 import app.models  # noqa: F401
 from app.api.dependencies.clock import FixedClock, get_clock
 from app.api.routers.auth import register_rate_limiter
+from app.api.routers.operator import operator_rate_limiter
+from app.api.routers.setup import setup_rate_limiter
 from app.db.database import Base, configure_sqlite, get_db
 from app.main import app
 from app.repositories.auth_repository import AuthRepository
@@ -67,6 +69,7 @@ TEST_ENV = {
     "PASSWORD_LOGIN": "",
     "TERMS_URL": "",
     "REGISTRATION": "",
+    "SECURITY_LOG_DAYS": "",
 }
 HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 
@@ -90,6 +93,8 @@ class ApiTestEnvironment:
             reset_account_limiter,
             account_mail_limiter,
             oidc_rate_limiter,
+            operator_rate_limiter,
+            setup_rate_limiter,
         ):
             limiter.reset()
 

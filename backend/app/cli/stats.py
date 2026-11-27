@@ -16,10 +16,12 @@ from app.models.expense import Expense
 from app.models.fuel import FuelEntry
 from app.models.group import Group, Membership
 from app.models.receipt import Receipt
+from app.models.security_event import SecurityEvent
 from app.models.trip import Trip
 from app.models.user import NO_PASSWORD, OidcIdentity, User
 from app.services.auth_service import utcnow
 from app.services.plans import effective_plan
+from app.services.security_log import FAILURE_EVENTS
 
 
 def _count(db: Session, query) -> int:
@@ -36,6 +38,7 @@ def collect(db: Session) -> dict:
             select(month, func.count()).where(model.created_at >= now - timedelta(days=366)).group_by(month)
         ):
             months[key] = months.get(key, 0) + count
+    events = select(func.count()).select_from(SecurityEvent).where(SecurityEvent.created_at >= now - timedelta(days=1))
     plans: dict[str, int] = {}
     for group in db.scalars(select(Group)):
         plan = effective_plan(group).id
@@ -69,6 +72,10 @@ def collect(db: Session) -> dict:
         "entries_per_month": dict(sorted(months.items())),
         # Plan in force per group (one implicit plan "default" without PLANS_FILE)
         "groups_per_plan": dict(sorted(plans.items())),
+        # Since 0.12: from the security log
+        "logins_24_hours": _count(db, events.where(SecurityEvent.event == "auth.login")),
+        "failed_attempts_24_hours": _count(db, events.where(SecurityEvent.event.in_(FAILURE_EVENTS))),
+        "blocks_24_hours": _count(db, events.where(SecurityEvent.event == "auth.rate_limited")),
     }
 
 

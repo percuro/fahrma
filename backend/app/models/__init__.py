@@ -9,6 +9,7 @@ from app.models.oidc_state import OidcLoginState
 from app.models.push import InstanceKey, PushSubscription, SentNotification
 from app.models.receipt import Receipt
 from app.models.reservation import Reservation
+from app.models.security_event import SecurityEvent
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
 from app.models.user import OidcIdentity, User, UserSession
@@ -29,6 +30,7 @@ __all__ = [
     "PushSubscription",
     "Receipt",
     "Reservation",
+    "SecurityEvent",
     "SentNotification",
     "Settlement",
     "SettlementTransfer",

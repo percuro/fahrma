@@ -18,6 +18,7 @@ from app.errors import AppError
 from app.models.user import AUTH_PASSWORD, NO_PASSWORD, ROLE_USER, User, UserSession
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import LoginRequest
+from app.services import security_log
 
 SESSION_COOKIE_NAME = "carshare_session"
 # Long sessions: the home-screen web app on iOS has its own cookie storage, and
@@ -104,6 +105,7 @@ class AuthService:
         """Create a session for an already verified account and set the cookie."""
         now = utcnow()
         self.repository.delete_expired_sessions(now)
+        security_log.record(self.repository.db, "auth.login", target=user, commit=False, method=auth_method)
         raw_token = secrets.token_urlsafe(48)
         user_agent = request.headers.get("User-Agent", "")[:USER_AGENT_MAX_LENGTH] or None
         session = self.repository.create_session(
@@ -164,6 +166,8 @@ class AuthService:
         role: str = ROLE_USER,
         locale: str | None = None,
         commit: bool = True,
+        via: str = "cli",
+        actor: User | None = None,
     ) -> User:
         username = normalize_username(username)
         if self.repository.get_user_by_username(username) is not None:
@@ -174,13 +178,20 @@ class AuthService:
         name = (display_name or "").strip() or username
         password_hash = self.hash_password(password) if password is not None else NO_PASSWORD
         user = User(username=username, display_name=name, password_hash=password_hash, role=role, locale=locale)
-        return self.repository.add_user(user, commit=commit)
+        self.repository.add_user(user, commit=False)
+        details = {"via": via, "role": role} if role != ROLE_USER else {"via": via}
+        security_log.record(self.repository.db, "account.created", actor=actor, target=user, commit=False, **details)
+        if commit:
+            self.repository.db.commit()
+            self.repository.db.refresh(user)
+        return user
 
     def set_password(self, username: str, password: str) -> None:
         user = self.repository.get_user_by_username(username)
         if user is None or user.is_deleted or user.placeholder:
             raise AccountError("account_not_found", "Account not found", status.HTTP_404_NOT_FOUND)
         self.check_password(password)
+        security_log.record(self.repository.db, "account.password_changed", target=user, commit=False, via="cli")
         self.repository.set_password(user, self.hash_password(password))
 
     @staticmethod

@@ -20,6 +20,7 @@ from app.models.car import Car
 from app.models.group import ROLE_ADMIN, Group, Membership
 from app.models.receipt import Receipt
 from app.models.user import User
+from app.services import security_log
 
 
 def group_today(group: Group) -> date:
@@ -84,13 +85,31 @@ def group_plan_read(db: Session, group: Group, today: date) -> dict:
     }
 
 
-def set_plan(db: Session, group: Group, plan: str | None, until: date | None, note: str | None) -> None:
+def set_plan(
+    db: Session,
+    group: Group,
+    plan: str | None,
+    until: date | None,
+    note: str | None,
+    *,
+    actor: User | None = None,
+    by: str = "admin",
+) -> None:
     """Set a group's plan (None = the default plan); the caller commits."""
     settings = get_plans()
     if plan is not None and plan not in settings.plans:
         raise AppError(status.HTTP_422_UNPROCESSABLE_CONTENT, "plan_unknown", "Unknown plan", plan=plan)
+    until = until if plan is not None else None
+    if (group.plan, group.plan_until) != (plan, until):
+        details = {
+            "group_id": group.id,
+            "group": group.name,
+            "plan": plan,
+            "until": until.isoformat() if until else None,
+        }
+        security_log.record(db, "plan.changed", actor=actor, commit=False, by=by, **details)
     group.plan = plan
-    group.plan_until = until if plan is not None else None
+    group.plan_until = until
     group.plan_note = (note or "").strip() or None
 
 
