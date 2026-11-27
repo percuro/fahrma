@@ -9,6 +9,7 @@ const s = (value: unknown) => String(value ?? '');
 
 export const de = {
   common: {
+    pageFailed: 'Diese Seite konnte nicht geladen werden.',
     loading: 'Lädt …',
     loadFailed: 'Konnte nicht geladen werden.',
     retry: 'Erneut versuchen',

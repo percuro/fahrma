@@ -5,6 +5,7 @@ const s = (value: unknown) => String(value ?? '');
 
 export const en: Messages = {
   common: {
+    pageFailed: 'This page could not be loaded.',
     loading: 'Loading …',
     loadFailed: 'Could not be loaded.',
     retry: 'Try again',
