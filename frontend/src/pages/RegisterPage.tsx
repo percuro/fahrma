@@ -10,6 +10,9 @@ import { Loading } from '../components/Status';
 import { LegalLinks } from '../components/LegalLinks';
 import { AccountFields } from '../components/AccountFields';
 import { useAccountForm } from '../components/account-form';
+import { OidcButton } from '../components/OidcButton';
+import { useCallbackParams } from '../hooks/useCallbackParams';
+import { callbackErrorText } from '../lib/oidc';
 
 /** Open registration (REGISTRATION=open): an account without a group. */
 export function RegisterPage() {
@@ -23,6 +26,8 @@ export function RegisterPage() {
   const [accept, setAccept] = useState(false);
   const [email, setEmail] = useState('');
   const [pending, setPending] = useState<string | null>(null);
+  const callback = useCallbackParams();
+  const [termsMissing, setTermsMissing] = useState(false);
   const register = useMutation({
     mutationFn: () =>
       apiFetch<Me | RegistrationPending>('/v1/auth/register', {
@@ -57,14 +62,28 @@ export function RegisterPage() {
     event.preventDefault();
     if (form.validate()) register.mutate();
   };
-  const error = form.error || (register.isError ? errorText(register.error) : '');
+  const passwords = meta.data.password_login !== false;
+  const oidc = !!meta.data.oidc;
+  /** "Register with …": the username is optional (the provider suggests one), the terms are not. */
+  const providerBody = () => {
+    if (termsUrl && !accept) {
+      setTermsMissing(true);
+      return null;
+    }
+    setTermsMissing(false);
+    const { username, display_name } = form.body();
+    return { purpose: 'register', username: username || null, display_name, locale: lang, accept_terms: accept };
+  };
+  const error = (termsMissing ? t.errors.terms_not_accepted({}) : '')
+    || (callbackErrorText(callback.error))
+    || form.error || (register.isError ? errorText(register.error) : '');
   return (
     <main className="center">
       <form className="card login" onSubmit={submit}>
         <h1>{t.register.title}</h1>
         <p className="subtle m-0">{t.register.intro}</p>
-        <AccountFields form={form} />
-        {meta.data.mail && (
+        <AccountFields form={form} withoutPassword={!passwords} />
+        {meta.data.mail && passwords && (
           <label className="field">
             <span>{t.register.email}</span>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required maxLength={254} autoComplete="email" />
@@ -80,7 +99,9 @@ export function RegisterPage() {
           </label>
         )}
         {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" className="button primary" disabled={register.isPending}>{t.register.submit}</button>
+        {passwords && <button type="submit" className="button primary" disabled={register.isPending}>{t.register.submit}</button>}
+        {oidc && passwords && <p className="subtle divider">{t.oidc.or}</p>}
+        {oidc && <OidcButton action="register" primary={!passwords} body={providerBody} />}
         <Link to="/" className="link-button">{t.register.haveAccount}</Link>
         <LegalLinks />
       </form>

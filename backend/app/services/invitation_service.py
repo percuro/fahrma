@@ -13,6 +13,8 @@ whether an address or account exists.
 
 import json
 import secrets
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from fastapi import BackgroundTasks, Request, Response, status
@@ -31,7 +33,7 @@ from app.models.invitation import (
     PURPOSE_VERIFY_EMAIL,
     Invitation,
 )
-from app.models.user import User, UserSession
+from app.models.user import AUTH_OIDC, AUTH_PASSWORD, NO_PASSWORD, User, UserSession
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import RegisterRequest
 from app.schemas.invitation import (
@@ -42,7 +44,7 @@ from app.schemas.invitation import (
     InvitationRead,
 )
 from app.services import mail_texts
-from app.services.auth_service import AccountError, AuthService, normalize_username, utcnow
+from app.services.auth_service import AccountError, AuthService, normalize_username, require_password_login, utcnow
 from app.services.limits import check_new_group, check_new_member
 from app.services.login_rate_limiter import LoginRateLimiter
 from app.services.mail import Mail, check_account_quota, require_mail, send_later
@@ -87,6 +89,20 @@ def new_token() -> tuple[str, str]:
 
 def link(token: str) -> str:
     return f"{get_public_url()}/invite#{token}"
+
+
+@dataclass(frozen=True)
+class External:
+    """A link used through the OIDC provider: the account gets no password, `attach` links it.
+
+    `attach` runs before the change is committed, so a failed link leaves the invitation unused.
+    """
+
+    attach: Callable[[User], None]
+
+
+# Links that can be used through the provider (not: confirming an address, finishing a registration)
+EXTERNAL_KINDS = ("group", "personal", PURPOSE_SIGNUP, PURPOSE_PASSWORD_RESET)
 
 
 class InvitationService:
@@ -251,6 +267,10 @@ class InvitationService:
         user = self.db.scalars(select(User).where(or_(User.username == value, User.email == value))).first()
         if user is None or not user.is_active or user.placeholder or not user.email:
             return
+        # Without a password the account logs in with the provider only (often on purpose, as
+        # protection): a mailbox must not be a way around it. An instance admin can still create a link.
+        if not user.has_password:
+            return
         key = f"user-{user.id}"
         try:
             reset_account_limiter.check(key, "-")
@@ -368,24 +388,79 @@ class InvitationService:
         self, data: InvitationAccept, request: Request, response: Response, user: User | None
     ) -> InvitationAccepted:
         found = self._find_valid(data.token, request)
+        return self._accept_found(found, data, request, response, user, None)
+
+    # --- Through the OIDC provider --------------------------------------------
+
+    def find_for_provider(self, token: str, request: Request) -> Invite | Invitation:
+        """The link behind a token, if it can be used through the provider (checked before the redirect)."""
+        found = self._find_valid(token, request)
+        if kind_of(found) not in EXTERNAL_KINDS:
+            raise AppError(status.HTTP_409_CONFLICT, "oidc_not_for_link", "This link cannot be used with the provider")
+        return found
+
+    def check_new_username(self, username: str | None) -> str:
+        """Check the chosen username before the redirect, so a mistake shows on the form."""
+        try:
+            name = normalize_username(username or "")
+        except AccountError as exc:
+            raise exc.to_http() from exc
+        if self.auth.repository.get_user_by_username(name) is not None:
+            raise AppError(status.HTTP_409_CONFLICT, "username_taken", "Username already exists")
+        return name
+
+    def accept_external(
+        self,
+        model: type[Invite] | type[Invitation],
+        row_id: int,
+        data: InvitationAccept,
+        request: Request,
+        response: Response,
+        external: External,
+    ) -> InvitationAccepted:
+        """Finish a link after the provider: the link was found by its token before the redirect."""
+        found = self.db.get(model, row_id)
+        if found is None or found.used_at is not None or found.expires_at <= utcnow():
+            raise invalid()
+        if kind_of(found) not in EXTERNAL_KINDS:
+            raise invalid()
+        return self._accept_found(found, data, request, response, None, external)
+
+    def _accept_found(
+        self,
+        found: Invite | Invitation,
+        data: InvitationAccept,
+        request: Request,
+        response: Response,
+        user: User | None,
+        external: External | None,
+    ) -> InvitationAccepted:
         if isinstance(found, Invite):
             if found.placeholder_user_id is not None:
-                return self._accept_personal(found, data, request, response, user)
-            return self._accept_group(found, data, request, response, user)
+                return self._accept_personal(found, data, request, response, user, external)
+            return self._accept_group(found, data, request, response, user, external)
         if found.purpose == PURPOSE_VERIFY_EMAIL:
             self._verify_email(found, request)
             return InvitationAccepted(kind=found.purpose, group_id=None)
         if found.purpose == PURPOSE_SIGNUP:
-            account = self._signup(found, data)
+            account = self._signup(found, data, external)
         elif found.purpose == PURPOSE_REGISTRATION:
             account = self._finish_registration(found)
+        elif external is not None:
+            account = self._recover(found, external)
         else:
             account = self._reset(found, data.password or "")
-        self.auth.start_session(account, request, response)
+        self.auth.start_session(account, request, response, AUTH_OIDC if external else AUTH_PASSWORD)
         return InvitationAccepted(kind=found.purpose, group_id=None)
 
     def _accept_group(
-        self, invite: Invite, data: InvitationAccept, request: Request, response: Response, user: User | None
+        self,
+        invite: Invite,
+        data: InvitationAccept,
+        request: Request,
+        response: Response,
+        user: User | None,
+        external: External | None = None,
     ) -> InvitationAccepted:
         group_id = invite.group_id
         if user is not None:
@@ -397,10 +472,12 @@ class InvitationService:
         check_new_member(self.db, group_id)
         new_account = user is None
         if new_account:
-            username, password = self._new_account_input(data.username, data.password)
+            username, password = self._new_account_input(data.username, data.password, external)
         self._claim(Invite, invite.id)
         if new_account:
             user = self._create_account(username, password, data, role=None, email=invite.email)
+            if external is not None:
+                external.attach(user)
         membership = self._membership(group_id, user.id)
         if membership is None:
             self.db.add(Membership(group_id=group_id, user_id=user.id))
@@ -410,11 +487,17 @@ class InvitationService:
         self.db.commit()
         if new_account:
             self.db.refresh(user)
-            self.auth.start_session(user, request, response)
+            self.auth.start_session(user, request, response, AUTH_OIDC if external else AUTH_PASSWORD)
         return InvitationAccepted(kind="group", group_id=group_id)
 
     def _accept_personal(
-        self, invite: Invite, data: InvitationAccept, request: Request, response: Response, user: User | None
+        self,
+        invite: Invite,
+        data: InvitationAccept,
+        request: Request,
+        response: Response,
+        user: User | None,
+        external: External | None = None,
     ) -> InvitationAccepted:
         """A personal link: the new or logged-in account takes over a placeholder member."""
         group_id = invite.group_id
@@ -438,17 +521,20 @@ class InvitationService:
             self.db.execute(delete(User).where(User.id == placeholder.id))
             account, new_account = user, False
         else:
-            username, password = self._new_account_input(data.username, data.password)
+            username, password = self._new_account_input(data.username, data.password, external)
             self._claim(Invite, invite.id)
             # The placeholder row becomes the account: its bookings are already its own
             placeholder.username = username
-            placeholder.password_hash = AuthService.hash_password(password)
+            placeholder.password_hash = AuthService.hash_password(password) if password is not None else NO_PASSWORD
             placeholder.display_name = (data.display_name or "").strip() or placeholder.display_name
             placeholder.locale = data.locale
             placeholder.placeholder = False
             placeholder.is_active = True
             placeholder.email = self._free_email(invite.email)
             self.db.execute(update(Invite).where(Invite.id == invite.id).values(used_by_user_id=placeholder.id))
+            if external is not None:
+                self.db.flush()
+                external.attach(placeholder)
             account, new_account = placeholder, True
         self.db.add(
             AuditEntry(
@@ -467,13 +553,15 @@ class InvitationService:
             raise AppError(status.HTTP_409_CONFLICT, "username_taken", "Username already exists") from exc
         if new_account:
             self.db.refresh(account)
-            self.auth.start_session(account, request, response)
+            self.auth.start_session(account, request, response, AUTH_OIDC if external else AUTH_PASSWORD)
         return InvitationAccepted(kind="group", group_id=group_id)
 
-    def _signup(self, invitation: Invitation, data: InvitationAccept) -> User:
-        username, password = self._new_account_input(data.username, data.password)
+    def _signup(self, invitation: Invitation, data: InvitationAccept, external: External | None = None) -> User:
+        username, password = self._new_account_input(data.username, data.password, external)
         self._claim(Invitation, invitation.id)
         user = self._create_account(username, password, data, role=invitation.role, email=invitation.email)
+        if external is not None:
+            external.attach(user)
         invitation.used_by_user_id = user.id
         self.db.commit()
         self.db.refresh(user)
@@ -526,6 +614,7 @@ class InvitationService:
             self._send(mail_texts.email_changed(previous, locale, user.username))
 
     def _reset(self, invitation: Invitation, password: str) -> User:
+        require_password_login()
         self._check_password(password)
         self._claim(Invitation, invitation.id)
         user = self.db.get(User, invitation.target_user_id)
@@ -533,6 +622,21 @@ class InvitationService:
             self.db.rollback()
             raise invalid()
         user.password_hash = AuthService.hash_password(password)
+        invitation.used_by_user_id = user.id
+        # Every device has to log in again; this browser gets a fresh session afterwards
+        self.db.execute(delete(UserSession).where(UserSession.user_id == user.id))
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
+    def _recover(self, invitation: Invitation, external: External) -> User:
+        """A password-reset link used through the provider: link the account instead of a new password."""
+        self._claim(Invitation, invitation.id)
+        user = self.db.get(User, invitation.target_user_id)
+        if user is None or not user.is_active:
+            self.db.rollback()
+            raise invalid()
+        external.attach(user)
         invitation.used_by_user_id = user.id
         # Every device has to log in again; this browser gets a fresh session afterwards
         self.db.execute(delete(UserSession).where(UserSession.user_id == user.id))
@@ -549,14 +653,19 @@ class InvitationService:
             query = query.where(User.id != except_user_id)
         return None if self.db.scalar(query) else email
 
-    def _new_account_input(self, username_in: str | None, password: str | None) -> tuple[str, str]:
-        """Check username and password before the link is used up."""
+    def _new_account_input(
+        self, username_in: str | None, password: str | None, external: External | None = None
+    ) -> tuple[str, str | None]:
+        """Check username and password before the link is used up; through the provider, no password."""
         try:
             username = normalize_username(username_in or "")
             if self.auth.repository.get_user_by_username(username) is not None:
                 raise AccountError("username_taken", "Username already exists", status.HTTP_409_CONFLICT)
         except AccountError as exc:
             raise exc.to_http() from exc
+        if external is not None:
+            return username, None
+        require_password_login()
         self._check_password(password or "")
         return username, password or ""
 
@@ -568,7 +677,7 @@ class InvitationService:
             raise exc.to_http() from exc
 
     def _create_account(
-        self, username: str, password: str, data: InvitationAccept, role: str | None, email: str | None = None
+        self, username: str, password: str | None, data: InvitationAccept, role: str | None, email: str | None = None
     ) -> User:
         try:
             user = self.auth.create_user(
@@ -613,3 +722,9 @@ class InvitationService:
             invitation_rate_limiter.record_failure(ip_address, ip_address)
             raise invalid()
         return found
+
+
+def kind_of(found: Invite | Invitation) -> str:
+    if isinstance(found, Invite):
+        return "personal" if found.placeholder_user_id is not None else "group"
+    return found.purpose

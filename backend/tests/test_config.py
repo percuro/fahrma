@@ -1,5 +1,7 @@
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from app import config
@@ -58,6 +60,32 @@ class ConfigTest(unittest.TestCase):
             self.assertEqual(config.get_default_timezone_name(), "America/New_York")
         with self.env(PUBLIC_URL="https://x.org", DEFAULT_TIMEZONE="Mars/Base"), self.assertRaises(config.ConfigError):
             config.validate()
+
+    def test_oidc_settings(self):
+        with self.env(OIDC_ISSUER="", OIDC_CLIENT_ID=""):
+            self.assertIsNone(config.get_oidc_settings())
+        with self.env(OIDC_ISSUER="https://auth.example.org", OIDC_CLIENT_ID=""), self.assertRaises(config.ConfigError):
+            config.get_oidc_settings()
+        with self.env(OIDC_ISSUER="auth.example.org", OIDC_CLIENT_ID="x"), self.assertRaises(config.ConfigError):
+            config.get_oidc_settings()
+        env = {"OIDC_ISSUER": "https://auth.example.org", "OIDC_CLIENT_ID": "fahrma"}
+        with self.env(**env, OIDC_SCOPES="profile email"), self.assertRaises(config.ConfigError):
+            config.get_oidc_settings()
+        with self.env(**env, OIDC_SCOPES="", OIDC_CLIENT_SECRET="", OIDC_LABEL="", OIDC_AUTO_CREATE=""):
+            settings = config.get_oidc_settings()
+        self.assertEqual(settings.scopes, "openid profile email")
+        self.assertEqual((settings.client_secret, settings.auto_create), (None, False))
+
+    def test_oidc_client_secret_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            secret = Path(directory) / "secret"
+            secret.write_text("geheim\n", encoding="utf-8")
+            env = {"OIDC_ISSUER": "https://auth.example.org", "OIDC_CLIENT_ID": "fahrma", "OIDC_CLIENT_SECRET": "x"}
+            with self.env(**env, OIDC_CLIENT_SECRET_FILE=str(secret)):
+                self.assertEqual(config.get_oidc_settings().client_secret, "geheim")
+            missing = str(secret) + "-missing"
+            with self.env(**env, OIDC_CLIENT_SECRET_FILE=missing), self.assertRaises(config.ConfigError):
+                config.get_oidc_settings()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,9 @@ const addDays = (day: string, n: number) => {
 test('reserve a car, see the clash, change and cancel it', async ({ page, request }) => {
   const { group, car } = await createGroupWithCar(request);
   const base = `/api/v1/groups/${group.id}`;
-  const day = addDays(await today(request), 2);
+  // Next Monday: both reservations (Monday and Tuesday) are in the future and in the same calendar week
+  const now = await today(request);
+  const day = addDays(now, 7 - ((new Date(`${now}T00:00:00Z`).getUTCDay() + 6) % 7));
   const added = await request.post(`${base}/members`, { data: { display_name: 'Oma' } });
   expect(added.status(), await added.text()).toBe(201);
   const oma = ((await added.json()) as typeof group).members.find((m) => m.display_name === 'Oma')!.user_id;

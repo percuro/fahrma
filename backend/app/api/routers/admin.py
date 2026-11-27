@@ -6,11 +6,13 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import require_admin
 from app.db.database import get_db
 from app.models.user import User
+from app.repositories.auth_repository import AuthRepository
 from app.schemas.admin import AdminUserRead, AdminUserUpdate
 from app.schemas.invitation import InvitationCreate, InvitationCreated, InvitationRead, PasswordResetCreate
 from app.schemas.plans import OperatorGroupRead, PlanUpdate
 from app.services.admin_service import AdminService
 from app.services.invitation_service import InvitationService
+from app.services.oidc_service import OidcService
 from app.services.plans import get_group, list_groups, operator_group_read, set_plan
 
 router = APIRouter()
@@ -31,6 +33,16 @@ def update_user(
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_user(user_id: int, admin: User = Depends(require_admin), db: Session = Depends(get_db)):
     AdminService(db).delete_user(admin, user_id)
+
+
+@router.delete("/users/{user_id}/oidc", status_code=status.HTTP_204_NO_CONTENT)
+def unlink_oidc(user_id: int, db: Session = Depends(get_db)):
+    """Remove an account's link to the provider (e.g. a lost provider account) and log it out everywhere.
+
+    It logs in again with its password, or a password-reset link."""
+    user = AdminService(db).get_user(user_id)
+    OidcService(db).unlink(user, by="admin")
+    AuthRepository(db).delete_sessions(user.id)
 
 
 @router.post("/users/{user_id}/password-reset", response_model=InvitationCreated, status_code=status.HTTP_201_CREATED)

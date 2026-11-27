@@ -1,5 +1,36 @@
 # Changelog
 
+## 0.11.0-rc.2 – 2026-11-27
+
+Login through your own OpenID Connect provider: Authelia, Authentik, Pocket ID, Keycloak or any other, next to passwords or instead of them.
+
+- **"Log in with …"** on the login page once `OIDC_ISSUER`, `OIDC_CLIENT_ID` and `OIDC_CLIENT_SECRET` are set; `OIDC_LABEL` names the button. Without `OIDC_ISSUER` nothing changes. See [Login through your own provider](docs/oidc.md).
+- **Every way into an account works with the provider:** group invitations, personal links that take over a member without an account, instance invitations ("Continue with …"), open registration ("Register with …", with the terms as before), and the first-run setup. The link is used up only when the login succeeds.
+- **Link an existing account** on the profile page under *Login*, confirmed with your password; afterwards both ways work. You can remove the link while a password remains. A password-reset link can link the account instead of setting a password.
+- **Accounts without a password** confirm changes to their address and the deletion of their account with a login at the provider that is at most 10 minutes old; otherwise the app asks to *Confirm with …*. They can set a password later.
+- **Remove password:** a linked account can give up its password (profile → *Login*), confirmed with a fresh login at the provider. It then logs in with the provider only – with passkeys or two factors there, that is the protection a password alone does not give. "Forgot password" by mail no longer applies to it; an instance admin can still create a reset link.
+- **A new account takes the provider's address** if the provider has confirmed it and no other account uses it. Existing accounts keep managing their own.
+- `OIDC_AUTO_CREATE=on` creates an account on the first login, for providers that already decide who may use fahrma. `PASSWORD_LOGIN=off` turns passwords off entirely.
+- **Instance administration** shows who logs in with the provider and who has no password, and can remove an account's link (which logs it out everywhere). The devices list shows which logins came through the provider.
+- `app.cli.stats` counts linked accounts and accounts without a password; *My data* contains the link.
+
+### Security
+
+- Authorization code flow with PKCE (S256). Only ID tokens signed with an asymmetric key of the provider are accepted (no HS256, no unsigned tokens); issuer, audience, `azp`, expiry, nonce and subject are checked, userinfo only counts for the same subject.
+- Accounts are linked by issuer and subject, never by e-mail address.
+- Every login is bound to the browser that started it (a cookie only for the callback path) and works once within 10 minutes; at most 30 starts per IP address in 15 minutes.
+- Linking needs the password, so a stolen session cannot add a permanent way in. Removing the last way to log in is refused.
+- Deleting an account also removes its link, so the provider account cannot log in to it again.
+- "Forgot password" by mail does nothing for accounts without a password, so a mailbox cannot open an account that logs in with the provider only.
+
+### Upgrade notes
+
+- Migration `0011` adds the tables `oidc_identities` and `oidc_login_states` and the columns `auth_method` and `authenticated_at` to `user_sessions`; existing sessions count as password logins.
+- New optional settings `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`/`OIDC_CLIENT_SECRET_FILE`, `OIDC_SCOPES`, `OIDC_LABEL`, `OIDC_AUTO_CREATE`, `PASSWORD_LOGIN`. The start is refused with `PASSWORD_LOGIN=off` but no provider, and with `OIDC_AUTO_CREATE=on` together with `TERMS_URL`.
+- Register the redirect URI `https://<PUBLIC_URL>/api/v1/auth/oidc/callback` at the provider.
+- API: `POST /v1/auth/oidc/start` (`login`, `register`, `link`, `reauth`), `GET /v1/auth/oidc/callback`, `POST /v1/invites/oidc`, `POST /v1/setup/oidc`, `DELETE /v1/account/oidc`, `DELETE /v1/account/password`, `DELETE /v1/admin/users/{id}/oidc`. `/v1/meta` has `password_login` and `oidc`, `/v1/auth/me` has `has_password` and `oidc`, admin users have `has_password` and `oidc_linked`, sessions have `auth_method`. `current_password` (password change) and `password` (address change, removing the address, account deletion) are optional for accounts without a password. New error codes `oidc_disabled`, `oidc_provider_unavailable`, `oidc_invalid_response`, `oidc_provider_error`, `oidc_denied`, `oidc_state_invalid`, `oidc_reauth_failed`, `oidc_no_account`, `oidc_already_linked`, `oidc_wrong_account`, `oidc_not_linked`, `oidc_not_for_link`, `reauth_required`, `password_login_disabled`, `last_login_method`, `no_password`.
+- New dependency: `joserfc` (ID token checks).
+
 ## 0.10.0 – 2026-11-26
 
 Receipt photos: a photo of the receipt on fuel entries and expenses, straight from the phone camera, with storage per plan.

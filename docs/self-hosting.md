@@ -155,7 +155,7 @@ Test a restore now and then; a backup you never restored is a hope, not a backup
 
 ## Account management
 
-Accounts are normally created through invitation links: group admins invite people into their group, instance admins can invite people without a group and create password-reset links on the administration page (profile → *Instance administration*). With `REGISTRATION=open`, people can also register themselves. Everyone can change their password, see and log out their devices, download their data and delete their account on the profile page.
+Accounts are normally created through invitation links: group admins invite people into their group, instance admins can invite people without a group and create password-reset links on the administration page (profile → *Instance administration*). With `REGISTRATION=open`, people can also register themselves. With your own OpenID Connect provider, people can log in there instead of with a fahrma password: through an invitation, the registration, by linking their account on the profile page, or automatically; see [Login through your own provider](oidc.md). Everyone can change their password, see and log out their devices, download their data and delete their account on the profile page.
 
 From the command line:
 

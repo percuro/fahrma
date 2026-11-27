@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
-from app.models.user import ROLE_ADMIN, User, UserSession
+from app.models.user import AUTH_PASSWORD, ROLE_ADMIN, User, UserSession
 
 
 class AuthRepository:
@@ -29,10 +29,22 @@ class AuthRepository:
         self.db.commit()
 
     def create_session(
-        self, user: User, token_hash: str, expires_at: datetime, user_agent: str | None, now: datetime
+        self,
+        user: User,
+        token_hash: str,
+        expires_at: datetime,
+        user_agent: str | None,
+        now: datetime,
+        auth_method: str = AUTH_PASSWORD,
     ) -> UserSession:
         session = UserSession(
-            user_id=user.id, token_hash=token_hash, expires_at=expires_at, user_agent=user_agent, last_seen_at=now
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=expires_at,
+            user_agent=user_agent,
+            last_seen_at=now,
+            auth_method=auth_method,
+            authenticated_at=now,
         )
         user.last_seen_at = now
         self.db.add(session)

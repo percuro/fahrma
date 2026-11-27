@@ -4,7 +4,7 @@
 
 Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars shared by family, neighbours or friends. Log a trip in seconds on your phone, add the fuel receipt, and see who owes whom – to the cent, and traceable down to every single trip. No rental platform, no commission, no spreadsheet at the end of the month.
 
-> Status: 0.9 – ready to host for others: plans per group, a hand-off to your own billing, and unused accounts deleted after a warning. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
+> Status: 0.11 – login through your own OpenID Connect provider, photos of receipts, and everything to host it for others: plans per group, a hand-off to your own billing, unused accounts deleted after a warning. Ready to self-host for your family or club; see [hosting for others](docs/hosting-for-others.md) if you run it for people you do not know.
 
 ## Features
 
@@ -19,6 +19,7 @@ Shared cars run on trust. fahrma is a small, self-hosted cost tracker for cars s
 - **Checks instead of surprises:** overlapping odometer readings are rejected, gaps are shown and must be confirmed, running trips block settling.
 - **Groups with roles:** every person has their own login; admins add cars and invite others with a one-time link. People who do not want an account can be added by name; the others record for them, and a personal link lets them take over later. Audit log of every change, CSV and complete JSON export.
 - **Move freely:** export a group as JSON and import it on another instance – self-hosted to hosted and back – with every entry and settlement intact.
+- **Login through your own provider** (optional): Authelia, Authentik, Pocket ID, Keycloak or any other OpenID Connect provider, next to passwords or instead of them – for invitations, registration, the first setup and linking an existing account. See [docs/oidc.md](docs/oidc.md).
 - **Optional e-mail:** forgot password, confirmed addresses, invitations by mail, registration with address confirmation. Without it, everything works with links.
 - **Your data stays yours:** change your password, see and log out your devices, download everything about you, or delete your account – your trips stay anonymously, so the others' balances keep adding up. Operators can have unused accounts deleted after a warning.
 - **Instance administration:** accounts, roles, invitation and password-reset links – without seeing anybody's trips. Optional open registration, operator links (imprint, privacy, terms) and limits for hosting it for others.
@@ -44,6 +45,7 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 - [Self-hosting](docs/self-hosting.md): install, reverse proxy (Caddy, Traefik, Nginx Proxy Manager), updates, backup and restore
 - [Configuration](docs/configuration.md): all environment variables
+- [Login through your own provider](docs/oidc.md): OpenID Connect with Authelia, Authentik, Pocket ID and others
 - [Hosting for others](docs/hosting-for-others.md): checklist when strangers use your instance, plans per group
 - [Operator API](docs/operator-api.md): setting plans from your own billing service
 - [How it calculates](docs/calculation.md): rates, splits, rounding, transfers, with an example
@@ -53,8 +55,8 @@ Then point a TLS reverse proxy at `127.0.0.1:8000` and open `https://cars.exampl
 
 ## Roadmap
 
-- **0.11** login via OpenID Connect
-- **0.12** beta hardening; **1.0** stable API and configuration
+- ~~**0.11** login via OpenID Connect~~ ✓
+- **0.12** beta hardening (with a security log of logins and account changes); **1.0** stable API and configuration
 
 ## Sibling project
 

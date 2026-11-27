@@ -1,11 +1,13 @@
 """Self-service for the logged-in account: password, devices, data export, deletion."""
 
 import json
+from datetime import timedelta
 
 from fastapi import Request, Response, status
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.orm import Session
 
+from app.config import get_oidc_settings
 from app.errors import AppError
 from app.models.audit import AuditEntry
 from app.models.expense import Expense
@@ -13,14 +15,15 @@ from app.models.fuel import FuelEntry
 from app.models.group import ROLE_ADMIN, ROLE_MEMBER, Group, Invite, Membership
 from app.models.idempotency import IdempotencyKey
 from app.models.invitation import Invitation
+from app.models.oidc_state import OidcLoginState
 from app.models.push import PushSubscription, SentNotification
 from app.models.reservation import Reservation
 from app.models.settlement import Settlement, SettlementTransfer
 from app.models.trip import Trip, TripExternalPayment, TripShare
-from app.models.user import ROLE_USER, User
+from app.models.user import AUTH_OIDC, NO_PASSWORD, ROLE_USER, OidcIdentity, User
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import DeletionPreview, SessionRead
-from app.services.auth_service import AccountError, AuthService, clear_session_cookie, utcnow
+from app.services.auth_service import AccountError, AuthService, clear_session_cookie, require_password_login, utcnow
 from app.services.devices import describe_user_agent
 from app.services.group_service import delete_group_data
 from app.services.login_rate_limiter import login_rate_limiter
@@ -29,6 +32,8 @@ from app.services.reservation_service import delete_upcoming
 from app.services.rows import row_dict
 
 EXPORT_FORMAT = "fahrma-account/1"
+# Without a password, a sensitive change needs a login at the provider this recent
+REAUTH_WINDOW = timedelta(minutes=10)
 
 
 def anonymous_name(user_id: int) -> str:
@@ -47,6 +52,30 @@ class AccountService:
 
     # --- Password and devices -----------------------------------------------
 
+    def confirm(self, user: User, password: str | None, request: Request, session_id: int) -> None:
+        """Make sure it is really the account holder before a sensitive change.
+
+        With a password: re-check it. Without one (OIDC only): the session must have logged in
+        at the provider within the last few minutes, otherwise 403 reauth_required and the
+        web app sends the person through the provider again.
+        """
+        if user.has_password:
+            self.verify_password(user, password or "", request)
+            return
+        self.require_fresh_provider_login(user, session_id)
+
+    def require_fresh_provider_login(self, user: User, session_id: int) -> None:
+        """403 reauth_required unless this session logged in at the provider in the last few minutes."""
+        session = self.repository.get_session_for_user(session_id, user.id)
+        authenticated_at = (session.authenticated_at or session.created_at) if session is not None else None
+        if (
+            session is None
+            or session.auth_method != AUTH_OIDC
+            or authenticated_at is None
+            or authenticated_at < utcnow() - REAUTH_WINDOW
+        ):
+            raise AppError(status.HTTP_403_FORBIDDEN, "reauth_required", "Log in at the provider again to confirm")
+
     def verify_password(self, user: User, password: str, request: Request) -> None:
         """Re-check the password before a sensitive change; limited like the login."""
         ip_address = client_ip(request)
@@ -57,8 +86,10 @@ class AccountService:
             raise AppError(status.HTTP_403_FORBIDDEN, "wrong_password", "The password is wrong")
         login_rate_limiter.record_success(user.username)
 
-    def change_password(self, user: User, current: str, new: str, request: Request, session_id: int) -> None:
-        self.verify_password(user, current, request)
+    def change_password(self, user: User, current: str | None, new: str, request: Request, session_id: int) -> None:
+        """Change the password, or set a first one for an account that logs in through OIDC."""
+        require_password_login()
+        self.confirm(user, current, request, session_id)
         try:
             AuthService.check_password(new)
         except AccountError as exc:
@@ -66,6 +97,26 @@ class AccountService:
         user.password_hash = AuthService.hash_password(new)
         self.db.commit()
         # Every other device has to log in again with the new password
+        self.repository.delete_sessions(user.id, keep_session_id=session_id)
+
+    def remove_password(self, user: User, session_id: int) -> None:
+        """Log in with the provider only: the password stops working, other devices are logged out.
+
+        Needs a fresh login at the provider, which also shows that the link works right now, so
+        nobody locks themselves out. "Forgot password" by mail no longer applies to the account;
+        an instance admin can still create a password-reset link.
+        """
+        if not user.has_password:
+            raise AppError(status.HTTP_409_CONFLICT, "no_password", "This account has no password")
+        if get_oidc_settings() is None or user.oidc_identity is None:
+            raise AppError(
+                status.HTTP_409_CONFLICT,
+                "oidc_not_linked",
+                "Link the account with the provider first; without a password it could not log in otherwise",
+            )
+        self.require_fresh_provider_login(user, session_id)
+        user.password_hash = NO_PASSWORD
+        self.db.commit()
         self.repository.delete_sessions(user.id, keep_session_id=session_id)
 
     def sessions(self, user: User, current_session_id: int) -> list[SessionRead]:
@@ -76,6 +127,7 @@ class AccountService:
                 last_seen_at=session.last_seen_at,
                 device=describe_user_agent(session.user_agent),
                 current=session.id == current_session_id,
+                auth_method=session.auth_method,
             )
             for session in self.repository.list_sessions(user.id, utcnow())
         ]
@@ -110,8 +162,10 @@ class AccountService:
             groups_kept=[{"id": group.id, "name": group.name} for group in kept],
         )
 
-    def delete_own(self, user: User, password: str, request: Request, response: Response) -> None:
-        self.verify_password(user, password, request)
+    def delete_own(
+        self, user: User, password: str | None, request: Request, response: Response, session_id: int
+    ) -> None:
+        self.confirm(user, password, request, session_id)
         self.delete(user)
         clear_session_cookie(response)
 
@@ -154,9 +208,12 @@ class AccountService:
         self.db.execute(delete(PushSubscription).where(PushSubscription.user_id == user.id))
         self.db.execute(delete(SentNotification).where(SentNotification.user_id == user.id))
         self.repository.delete_sessions(user.id, commit=False)
+        # The provider's subject could otherwise still log in to the empty account
+        self.db.execute(delete(OidcIdentity).where(OidcIdentity.user_id == user.id))
+        self.db.execute(delete(OidcLoginState).where(OidcLoginState.user_id == user.id))
         user.username = f"~deleted-{user.id}"  # "~" is not allowed in usernames, so it never collides
         user.display_name = anonymous_name(user.id)
-        user.password_hash = "!"  # matches no password
+        user.password_hash = NO_PASSWORD
         user.email = None
         user.locale = None
         user.notify = None
@@ -233,12 +290,15 @@ class AccountService:
                 "role": user.role,
                 "created_at": user.created_at.isoformat() if user.created_at else None,
                 "last_seen_at": user.last_seen_at.isoformat() if user.last_seen_at else None,
+                "has_password": user.has_password,
             },
+            "oidc": _oidc_export(user.oidc_identity),
             "sessions": [
                 {
                     "created_at": session.created_at.isoformat(),
                     "last_seen_at": session.last_seen_at.isoformat() if session.last_seen_at else None,
                     "device": describe_user_agent(session.user_agent),
+                    "auth_method": session.auth_method,
                 }
                 for session in self.repository.list_sessions(uid, utcnow())
             ],
@@ -280,3 +340,16 @@ class AccountService:
                 .order_by(Reservation.starts_at)
             ),
         }
+
+
+def _oidc_export(link: OidcIdentity | None) -> dict | None:
+    if link is None:
+        return None
+    return {
+        "issuer": link.issuer,
+        "subject": link.subject,
+        "email": link.email,
+        "preferred_username": link.preferred_username,
+        "linked_at": link.created_at.isoformat(),
+        "last_login_at": link.last_login_at.isoformat() if link.last_login_at else None,
+    }

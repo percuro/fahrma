@@ -8,7 +8,10 @@ import { useI18n, useT } from '../i18n';
 import { Loading } from '../components/Status';
 import { LegalLinks } from '../components/LegalLinks';
 import { AccountFields } from '../components/AccountFields';
-import { useAccountForm } from '../components/account-form';
+import { useAccountForm, type AccountForm } from '../components/account-form';
+import { OidcButton } from '../components/OidcButton';
+import { useMeta } from '../hooks/useMeta';
+import { useOidcLabel } from '../hooks/useOidcLabel';
 import { LoginPage } from './LoginPage';
 
 interface Accepted {
@@ -150,8 +153,11 @@ function NewAccount({ token, title, intro, submit, initialName = '', onHaveAccou
 }) {
   const t = useT();
   const { lang } = useI18n();
+  const meta = useMeta();
   const form = useAccountForm(initialName);
   const accept = useAccept(token);
+  const passwords = meta.data?.password_login !== false;
+  const oidc = !!meta.data?.oidc;
   const onSubmit = (event: FormEvent) => {
     event.preventDefault();
     if (form.validate()) accept.mutate({ ...form.body(), locale: lang });
@@ -162,9 +168,11 @@ function NewAccount({ token, title, intro, submit, initialName = '', onHaveAccou
       <form className="card login" onSubmit={onSubmit}>
         <h1>{title}</h1>
         <p className="subtle m-0">{intro}</p>
-        <AccountFields form={form} />
+        <AccountFields form={form} withoutPassword={!passwords} />
         {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" className="button primary" disabled={accept.isPending}>{submit}</button>
+        {passwords && <button type="submit" className="button primary" disabled={accept.isPending}>{submit}</button>}
+        {oidc && passwords && <p className="subtle divider">{t.oidc.or}</p>}
+        {oidc && <ProviderAccount token={token} form={form} primary={!passwords} />}
         {onHaveAccount && <button type="button" className="link-button" onClick={onHaveAccount}>{t.invite.haveAccount}</button>}
         <LegalLinks />
       </form>
@@ -172,8 +180,23 @@ function NewAccount({ token, title, intro, submit, initialName = '', onHaveAccou
   );
 }
 
+/** "Continue with …": the same name and username, no password; the account is created after the provider. */
+function ProviderAccount({ token, form, primary }: { token: string; form: AccountForm; primary: boolean }) {
+  const { lang } = useI18n();
+  const body = () => {
+    if (!form.validate({ withoutPassword: true })) return null;
+    const { username, display_name } = form.body();
+    return { token, username, display_name, locale: lang };
+  };
+  return <OidcButton action="continue" path="/v1/invites/oidc" primary={primary} body={body} />;
+}
+
 function SetPassword({ token, username }: { token: string; username: string }) {
   const t = useT();
+  const meta = useMeta();
+  const provider = useOidcLabel();
+  const passwords = meta.data?.password_login !== false;
+  const oidc = !!meta.data?.oidc;
   const form = useAccountForm();
   const accept = useAccept(token);
   const onSubmit = (event: FormEvent) => {
@@ -186,10 +209,14 @@ function SetPassword({ token, username }: { token: string; username: string }) {
       <form className="card login" onSubmit={onSubmit}>
         <h1>{t.invite.resetTitle}</h1>
         <p className="subtle m-0">{t.invite.resetIntro(username)}</p>
-        <input type="text" name="username" value={username} autoComplete="username" readOnly hidden />
-        <AccountFields form={form} passwordOnly passwordLabel={t.invite.newPassword} />
-        {error && <p className="error" role="alert">{error}</p>}
-        <button type="submit" className="button primary" disabled={accept.isPending}>{t.invite.resetSubmit}</button>
+        {passwords && <>
+          <input type="text" name="username" value={username} autoComplete="username" readOnly hidden />
+          <AccountFields form={form} passwordOnly passwordLabel={t.invite.newPassword} />
+          {error && <p className="error" role="alert">{error}</p>}
+          <button type="submit" className="button primary" disabled={accept.isPending}>{t.invite.resetSubmit}</button>
+        </>}
+        {oidc && <p className="subtle m-0">{t.oidc.linkInstead(provider)}</p>}
+        {oidc && <OidcButton action="link" path="/v1/invites/oidc" primary={!passwords} body={() => ({ token })} />}
       </form>
     </main>
   );

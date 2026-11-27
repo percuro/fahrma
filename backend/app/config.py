@@ -361,6 +361,75 @@ def get_operator_token() -> str | None:
     return token
 
 
+@dataclass(frozen=True)
+class OidcSettings:
+    issuer: str
+    client_id: str
+    # None = public client: PKCE only, no client authentication at the token endpoint
+    client_secret: str | None
+    scopes: str
+    # Name on the button, e.g. "Authelia"; None = a translated "single sign-on"
+    label: str | None
+    auto_create: bool
+
+
+def get_oidc_settings() -> OidcSettings | None:
+    """None when OIDC is not configured (OIDC_ISSUER empty)."""
+    issuer = os.getenv("OIDC_ISSUER", "").strip()
+    if not issuer:
+        return None
+    parts = urlsplit(issuer)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise ConfigError(f"OIDC_ISSUER must start with https:// (got {issuer!r})")
+    client_id = os.getenv("OIDC_CLIENT_ID", "").strip()
+    if not client_id:
+        raise ConfigError("OIDC_CLIENT_ID is required when OIDC_ISSUER is set")
+    scopes = " ".join(os.getenv("OIDC_SCOPES", "").split()) or "openid profile email"
+    if "openid" not in scopes.split():
+        raise ConfigError(f"OIDC_SCOPES must contain openid (got {scopes!r})")
+    secret = os.getenv("OIDC_CLIENT_SECRET", "").strip() or None
+    secret_file = os.getenv("OIDC_CLIENT_SECRET_FILE", "").strip()
+    if secret_file:
+        try:
+            secret = Path(secret_file).read_text(encoding="utf-8").strip() or None
+        except OSError as exc:
+            raise ConfigError(f"OIDC_CLIENT_SECRET_FILE cannot be read: {exc}") from exc
+    return OidcSettings(
+        # Compared exactly with the provider's "issuer"; only a trailing slash is forgiven
+        issuer=issuer,
+        client_id=client_id,
+        client_secret=secret,
+        scopes=scopes,
+        label=os.getenv("OIDC_LABEL", "").strip()[:40] or None,
+        auto_create=env_bool("OIDC_AUTO_CREATE", False),
+    )
+
+
+def password_login_enabled() -> bool:
+    """PASSWORD_LOGIN=off: accounts log in, register and are set up through OIDC only."""
+    return env_bool("PASSWORD_LOGIN", True)
+
+
+def get_oidc_redirect_uri() -> str:
+    return f"{get_public_url()}/api/v1/auth/oidc/callback"
+
+
+def _validate_oidc() -> None:
+    settings = get_oidc_settings()
+    if settings is None:
+        if not password_login_enabled():
+            raise ConfigError("PASSWORD_LOGIN=off needs OIDC_ISSUER, otherwise nobody can log in")
+        return
+    if settings.auto_create and get_operator_links()["terms_url"]:
+        raise ConfigError(
+            "OIDC_AUTO_CREATE cannot be used with TERMS_URL: an account created on its first login "
+            "never accepts the terms. Use REGISTRATION=open instead, the registration page offers the provider"
+        )
+    host = urlsplit(settings.issuer).hostname or ""
+    if settings.issuer.startswith("http://") and host not in {"localhost", "127.0.0.1", "::1"}:
+        logger.warning("OIDC_ISSUER uses http://; the provider should be reached over https")
+
+
 def receipts_enabled() -> bool:
     """Receipt photos are on by default; RECEIPTS=off turns them off (no files are stored)."""
     return env_bool("RECEIPTS", True)
@@ -536,3 +605,4 @@ def validate() -> None:
         get_max_receipt_bytes()
     get_mail_settings()
     get_push_settings()
+    _validate_oidc()

@@ -17,6 +17,8 @@ All settings are environment variables (for Docker Compose: the `.env` file next
 | `REGISTRATION` | `invite` | `invite`: accounts only through invitation links (from a group admin, or from an instance admin on the administration page). `open`: anyone can register at `/register`; only possible after the first-run setup. Registrations are limited to 5 per IP address and hour. |
 | `INVITE_EXPIRY_DAYS` | `7` | How long invitation links stay valid. Password-reset links from an admin are valid for 24 hours, those requested by mail for 1 hour. |
 | `IMPRINT_URL`, `PRIVACY_URL`, `TERMS_URL` | – | Links to the operator's imprint, privacy policy and terms of use, shown on the login, registration, invitation and profile pages. With `TERMS_URL` and open registration, new accounts must accept the terms. The texts themselves are yours to write and host. |
+| `OIDC_ISSUER` | – (off) | Login through your own OpenID Connect provider (Authelia, Authentik, Pocket ID, Keycloak, …), in addition to passwords or instead of them. With `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` (or `OIDC_CLIENT_SECRET_FILE`), `OIDC_SCOPES`, `OIDC_LABEL` and `OIDC_AUTO_CREATE`; see [Login through your own provider](oidc.md). |
+| `PASSWORD_LOGIN` | `on` | `off`: no passwords; accounts log in, register and are set up only through the provider. Needs `OIDC_ISSUER`. |
 | `MAIL_FROM` | – | Sender of e-mails, e.g. `fahrma <noreply@example.org>`. E-mail is optional and off unless `MAIL_FROM` and `SMTP_HOST` are set; see [E-mail](#e-mail). |
 | `SMTP_HOST` | – | Mail server that accepts the mails for delivery (your provider's SMTP relay). |
 | `SMTP_PORT` | `587` (`465` with `tls`, `25` with `none`) | Port of the mail server. |

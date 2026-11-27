@@ -47,7 +47,8 @@ class ForgotPassword(BaseModel):
 
 class EmailChange(BaseModel):
     email: Email
-    password: str = Field(min_length=1, max_length=256)
+    # Accounts without a password confirm at the provider instead (reauth)
+    password: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 class GroupBrief(BaseModel):
@@ -68,6 +69,17 @@ class MeRead(BaseModel):
     groups: list[GroupBrief]
     today: str
     timezone: str
+    # False: the account logs in through the OIDC provider only (since 0.11)
+    has_password: bool = True
+    oidc: "OidcLinkRead | None" = None
+
+
+class OidcLinkRead(BaseModel):
+    """The account's link to the OIDC provider, as the provider last described it."""
+
+    email: str | None
+    preferred_username: str | None
+    linked_at: datetime
 
 
 class ProfileUpdate(BaseModel):
@@ -78,11 +90,13 @@ class ProfileUpdate(BaseModel):
 
 
 class PasswordConfirmation(BaseModel):
-    password: str = Field(min_length=1, max_length=256)
+    # Accounts without a password confirm at the provider instead (reauth)
+    password: str | None = Field(default=None, min_length=1, max_length=256)
 
 
 class PasswordChange(BaseModel):
-    current_password: str = Field(min_length=1, max_length=256)
+    # None: an account without a password sets its first one (after a fresh login at the provider)
+    current_password: str | None = Field(default=None, min_length=1, max_length=256)
     new_password: str = Field(min_length=1, max_length=256)
 
 
@@ -93,6 +107,8 @@ class SessionRead(BaseModel):
     # e.g. "iPhone · Safari"; None if the browser could not be recognised
     device: str | None
     current: bool
+    # "password" or "oidc" (since 0.11)
+    auth_method: str = "password"
 
 
 class GroupRef(BaseModel):
@@ -115,3 +131,6 @@ class DeletionPreview(BaseModel):
     admin_handover: list[AdminHandover]
     # Groups that keep the bookings under an anonymous name
     groups_kept: list[GroupRef]
+
+
+MeRead.model_rebuild()

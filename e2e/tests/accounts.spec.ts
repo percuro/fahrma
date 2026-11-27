@@ -38,7 +38,7 @@ test('change the password, see the devices, log in with the new password', async
   await fresh.page.goto('/');
   await fresh.page.getByLabel('Benutzername').fill(username);
   await fresh.page.getByLabel('Passwort').fill('another-password-789');
-  await fresh.page.getByRole('button', { name: 'Anmelden' }).click();
+  await fresh.page.getByRole('button', { name: 'Anmelden', exact: true }).click();
   await expect(fresh.page.getByRole('navigation', { name: 'Bereiche' })).toBeVisible();
   await fresh.context.close();
 });
@@ -52,7 +52,7 @@ test('delete the own account: bookings stay anonymously', async ({ browser, page
   await zone.getByLabel('Zur Bestätigung dein Passwort').fill(OTHER_PASSWORD);
   await zone.getByRole('button', { name: 'Zugang endgültig löschen' }).click();
   await confirmDialog(other.page, 'Zugang endgültig löschen');
-  await expect(other.page.getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(other.page.getByRole('button', { name: 'Anmelden', exact: true })).toBeVisible();
   await other.context.close();
 
   await page.goto(`/g/${group.id}/group`);
@@ -100,7 +100,7 @@ test('admin: invitation link, password reset link, deactivate', async ({ browser
   await confirmDialog(page, 'Deaktivieren');
   await expect(row.getByText('deaktiviert')).toBeVisible();
   await reset.page.reload();
-  await expect(reset.page.getByRole('button', { name: 'Anmelden' })).toBeVisible();
+  await expect(reset.page.getByRole('button', { name: 'Anmelden', exact: true })).toBeVisible();
   await reset.context.close();
 });
 

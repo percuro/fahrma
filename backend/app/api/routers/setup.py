@@ -10,12 +10,15 @@ from app.api.dependencies.clock import get_today
 from app.api.routers.auth import me_response
 from app.db.database import get_db
 from app.errors import AppError
+from app.models.oidc_state import PURPOSE_SETUP
 from app.models.user import ROLE_ADMIN
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import MeRead
+from app.schemas.oidc import OidcRedirect, SetupOidcStart
 from app.services import setup_service
-from app.services.auth_service import AccountError, AuthService
+from app.services.auth_service import AccountError, AuthService, normalize_username, require_password_login
 from app.services.login_rate_limiter import LoginRateLimiter
+from app.services.oidc_service import OidcService
 
 router = APIRouter()
 setup_rate_limiter = LoginRateLimiter()
@@ -36,6 +39,16 @@ def _already_done() -> AppError:
     return AppError(status.HTTP_409_CONFLICT, "setup_done", "Setup has already been completed")
 
 
+def _check_token(token: str, request: Request, db: Session) -> None:
+    ip_address = request.client.host if request.client else "unknown"
+    setup_rate_limiter.check("setup", ip_address)
+    if not setup_service.needs_setup(db):
+        raise _already_done()
+    if not setup_service.token_matches(token.strip()):
+        setup_rate_limiter.record_failure("setup", ip_address)
+        raise AppError(status.HTTP_403_FORBIDDEN, "setup_token_invalid", "Wrong setup token")
+
+
 @router.get("", response_model=SetupStatus)
 def setup_status(db: Session = Depends(get_db)):
     return SetupStatus(needed=setup_service.needs_setup(db))
@@ -49,13 +62,8 @@ def run_setup(
     db: Session = Depends(get_db),
     today: date = Depends(get_today),
 ):
-    ip_address = request.client.host if request.client else "unknown"
-    setup_rate_limiter.check("setup", ip_address)
-    if not setup_service.needs_setup(db):
-        raise _already_done()
-    if not setup_service.token_matches(data.token.strip()):
-        setup_rate_limiter.record_failure("setup", ip_address)
-        raise AppError(status.HTTP_403_FORBIDDEN, "setup_token_invalid", "Wrong setup token")
+    require_password_login()
+    _check_token(data.token, request, db)
     service = AuthService(AuthRepository(db))
     with setup_service.setup_lock():
         if not setup_service.needs_setup(db):
@@ -67,3 +75,15 @@ def run_setup(
     setup_service.clear_token()
     service.start_session(user, request, response)
     return me_response(db, user, today)
+
+
+@router.post("/oidc", response_model=OidcRedirect)
+def run_setup_with_oidc(data: SetupOidcStart, request: Request, response: Response, db: Session = Depends(get_db)):
+    """The first account logs in through the provider; it is created in the callback."""
+    _check_token(data.token, request, db)
+    try:
+        username = normalize_username(data.username)
+    except AccountError as exc:
+        raise exc.to_http() from exc
+    payload = {"username": username, "display_name": data.display_name}
+    return OidcRedirect(authorize_url=OidcService(db).start(PURPOSE_SETUP, request, response, payload=payload))

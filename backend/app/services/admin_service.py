@@ -85,4 +85,6 @@ class AdminService:
             last_seen_at=user.last_seen_at,
             group_count=group_count,
             deletion_due=deletion_day(user),
+            has_password=user.has_password,
+            oidc_linked=user.oidc_linked,
         )
