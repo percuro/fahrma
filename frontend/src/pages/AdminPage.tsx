@@ -9,6 +9,7 @@ import { useMeta } from '../hooks/useMeta';
 import { useFormat } from '../hooks/useFormat';
 import { useFeedback } from '../components/feedback-context';
 import { queryState } from '../components/queryState';
+import { useOidcLabel } from '../hooks/useOidcLabel';
 import { useI18n, useT } from '../i18n';
 
 const USERS_KEY = ['admin', 'users'] as const;
@@ -58,6 +59,7 @@ function Accounts() {
   const { confirm, toast } = useFeedback();
   const queryClient = useQueryClient();
   const meta = useMeta();
+  const provider = useOidcLabel();
   const users = useQuery({ queryKey: USERS_KEY, queryFn: () => apiFetch<AdminUser[]>('/v1/admin/users') });
   const [reset, setReset] = useState<{ user: AdminUser; link: InvitationCreated } | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: ['admin'] });
@@ -73,6 +75,13 @@ function Accounts() {
     mutationFn: (id: number) => apiFetch<void>(`/v1/admin/users/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
       toast(t.common.deleted);
+      void refresh();
+    },
+  });
+  const unlink = useMutation({
+    mutationFn: (user: AdminUser) => apiFetch<void>(`/v1/admin/users/${user.id}/oidc`, { method: 'DELETE' }),
+    onSuccess: (_result, user) => {
+      toast(a.oidcUnlinked(user.username));
       void refresh();
     },
   });
@@ -92,11 +101,16 @@ function Accounts() {
       update.mutate({ id: user.id, is_active: false });
     }
   };
+  const removeLink = async (user: AdminUser) => {
+    if (await confirm(a.oidcUnlinkConfirm(user.username, provider), { confirmLabel: a.oidcUnlink, danger: true })) {
+      unlink.mutate(user);
+    }
+  };
   const del = async (user: AdminUser) => {
     if (await confirm(a.confirmDelete(user.username), { confirmLabel: a.delete, danger: true })) remove.mutate(user.id);
   };
   const state = queryState([users], !!users.data);
-  const error = update.error ?? remove.error ?? createReset.error;
+  const error = update.error ?? remove.error ?? createReset.error ?? unlink.error;
   return (
     <section className="card">
       <h2 className="mt-0">{a.accounts}</h2>
@@ -112,6 +126,8 @@ function Accounts() {
                     u.email,
                     u.role === 'admin' && a.adminRole,
                     !u.is_active && a.inactive,
+                    u.oidc_linked && a.signsInWith(provider),
+                    u.has_password === false && a.noPassword,
                     a.groups(u.group_count),
                     u.last_seen_at ? a.lastSeen(f.date(u.last_seen_at)) : a.neverSeen,
                     u.deletion_due && a.deletionDue(f.date(u.deletion_due)),
@@ -138,6 +154,9 @@ function Accounts() {
                     <button type="button" className="button small" onClick={() => createReset.mutate({ user: u, byMail: true })}>
                       {a.resetByMail}
                     </button>
+                  )}
+                  {u.oidc_linked && (
+                    <button type="button" className="button small" onClick={() => removeLink(u)}>{a.oidcUnlink}</button>
                   )}
                   <button type="button" className="button small danger" onClick={() => del(u)}>{a.delete}</button>
                 </span>

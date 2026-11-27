@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiFetch, errorText } from '../lib/api';
@@ -10,7 +10,10 @@ import { APP_NAME } from '../app/brand';
 import { useFeedback } from '../components/feedback-context';
 import { useT } from '../i18n';
 import { CreateGroup } from './StartPage';
-import { ChangePassword, DeleteAccount, Devices, EmailAddress, MyData, Notifications } from './AccountSections';
+import { ChangePassword, DeleteAccount, Devices, EmailAddress, MyData, Notifications, SignInSection } from './AccountSections';
+import { useCallbackParams } from '../hooks/useCallbackParams';
+import { useOidcLabel } from '../hooks/useOidcLabel';
+import { callbackErrorText } from '../lib/oidc';
 import { LegalLinks } from '../components/LegalLinks';
 
 const LANGUAGE_NAMES = { de: 'Deutsch', en: 'English' } as const;
@@ -18,10 +21,21 @@ const LANGUAGE_NAMES = { de: 'Deutsch', en: 'English' } as const;
 export function ProfilePage() {
   const t = useT();
   const me = useSession();
+  // Back from the provider: #oidc=linked, #reauth=ok or #error=<code>
+  const callback = useCallbackParams();
+  const provider = useOidcLabel();
+  const { toast } = useFeedback();
+  useEffect(() => {
+    if (callback.oidc === 'linked') toast(t.account.linked(provider));
+    if (callback.reauth === 'ok') toast(t.account.reauthDone);
+  }, [callback, provider, t, toast]);
   return (
     <>
       <h1>{t.profile.title}</h1>
       <p className="subtle">{t.profile.signedInAs(me.username)}</p>
+      {callback.error && (
+        <p className="error" role="alert">{callbackErrorText(callback.error)}</p>
+      )}
       <ProfileForm me={me} />
       {me.groups.length > 0 && (
         <section>
@@ -43,6 +57,7 @@ export function ProfilePage() {
       )}
       <Notifications />
       <EmailAddress />
+      <SignInSection />
       <ChangePassword />
       <Devices />
       <MyData />

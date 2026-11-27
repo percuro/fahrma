@@ -17,7 +17,7 @@ from app.models.fuel import FuelEntry
 from app.models.group import Group, Membership
 from app.models.receipt import Receipt
 from app.models.trip import Trip
-from app.models.user import User
+from app.models.user import NO_PASSWORD, OidcIdentity, User
 from app.services.auth_service import utcnow
 from app.services.plans import effective_plan
 
@@ -46,6 +46,11 @@ def collect(db: Session) -> dict:
         "accounts_seen_30_days": _count(db, accounts.where(User.last_seen_at >= now - timedelta(days=30))),
         "admins": _count(db, accounts.where(User.role == "admin", User.is_active.is_(True))),
         "people_without_account": _count(db, select(func.count()).select_from(User).where(User.placeholder.is_(True))),
+        # Since 0.11: accounts linked to the OIDC provider, and those that can only log in there
+        "accounts_oidc_linked": _count(db, select(func.count()).select_from(OidcIdentity)),
+        "accounts_without_password": _count(
+            db, accounts.where(User.password_hash == NO_PASSWORD, User.is_active.is_(True))
+        ),
         "accounts_deleted": _count(db, select(func.count()).select_from(User).where(User.deleted_at.is_not(None))),
         "accounts_warned_inactive": _count(
             db,

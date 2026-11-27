@@ -12,6 +12,7 @@ from app.api.routers.health import router as health_router
 from app.api.routers.invitations import router as invitations_router
 from app.api.routers.meta import router as meta_router
 from app.api.routers.notifications import router as notifications_router
+from app.api.routers.oidc import router as oidc_router
 from app.api.routers.operator import router as operator_router
 from app.api.routers.receipts import router as receipts_router
 from app.api.routers.reservations import router as reservations_router
@@ -36,6 +37,7 @@ app.include_router(health_router)
 app.include_router(meta_router, prefix="/v1", tags=["meta"])
 app.include_router(setup_router, prefix="/v1/setup", tags=["setup"])
 app.include_router(auth_router, prefix="/v1/auth", tags=["auth"])
+app.include_router(oidc_router, prefix="/v1/auth/oidc", tags=["auth"])
 app.include_router(invitations_router, prefix="/v1/invites", tags=["invitations"])
 protected = [Depends(require_user)]
 app.include_router(account_router, prefix="/v1/account", tags=["account"], dependencies=protected)

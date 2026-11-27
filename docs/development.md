@@ -70,6 +70,19 @@ The mail tests need an instance that writes its mails to a directory the tests c
 
 The plan tests (`hosting.spec.ts`) need `-e PLANS_FILE=/config/plans.json -v "$PWD/e2e/plans.json:/config/plans.json:ro" -e BILLING_URL=https://example.org/plans`; without them they are skipped.
 
+The tests of the login through a provider (`oidc.spec.ts`) need Dex next to the instance, both on the host network so browser and backend reach the issuer at the same address:
+
+```bash
+docker run -d --name dex --network host -v "$PWD/e2e/oidc/dex.yaml:/etc/dex/config.yaml:ro" \
+  ghcr.io/dexidp/dex:v2.46.1 dex serve /etc/dex/config.yaml
+docker run -d --name app-e2e --network host -e PUBLIC_URL=http://localhost:8000 -e REGISTRATION=open \
+  -e TERMS_URL=https://example.org/terms -e OIDC_ISSUER=http://localhost:5556/dex -e OIDC_CLIENT_ID=fahrma \
+  -e OIDC_CLIENT_SECRET=fahrma-e2e-secret -e OIDC_LABEL=Dex app:dev
+E2E_OIDC=1 E2E_BASE_URL=http://localhost:8000 npx playwright test
+```
+
+Without `E2E_OIDC=1` they are skipped. The backend unit tests use an in-process fake provider (`backend/tests/oidc_fake.py`).
+
 Without Docker, run `uvicorn app.web:application` with `FRONTEND_DIST=../frontend/dist` (after `npm run build`) and a fresh database instead. The first run creates the account through the setup page; later runs log in (`E2E_USERNAME`/`E2E_PASSWORD`, defaults in `e2e/global-setup.ts`). Every test creates its own group, so tests do not depend on each other.
 
 ## Conventions

@@ -20,6 +20,7 @@ from app.services.auth_service import AuthService
 from app.services.invitation_service import invitation_rate_limiter, reset_account_limiter, reset_ip_limiter
 from app.services.login_rate_limiter import login_rate_limiter
 from app.services.mail import account_mail_limiter
+from app.services.oidc_service import oidc_rate_limiter
 
 PASSWORD = "sicheres-passwort-123"
 TEST_ORIGIN = "http://localhost:5173"
@@ -55,6 +56,17 @@ TEST_ENV = {
     "BILLING_URL": "",
     "OPERATOR_TOKEN": "",
     "OPERATOR_TOKEN_FILE": "",
+    # OIDC off, passwords on, unless a test sets them (tests/test_oidc_flows.py)
+    "OIDC_ISSUER": "",
+    "OIDC_CLIENT_ID": "",
+    "OIDC_CLIENT_SECRET": "",
+    "OIDC_CLIENT_SECRET_FILE": "",
+    "OIDC_SCOPES": "",
+    "OIDC_LABEL": "",
+    "OIDC_AUTO_CREATE": "",
+    "PASSWORD_LOGIN": "",
+    "TERMS_URL": "",
+    "REGISTRATION": "",
 }
 HEADERS = {"X-Carshare-CSRF": "1", "Origin": TEST_ORIGIN}
 
@@ -77,6 +89,7 @@ class ApiTestEnvironment:
             reset_ip_limiter,
             reset_account_limiter,
             account_mail_limiter,
+            oidc_rate_limiter,
         ):
             limiter.reset()
 

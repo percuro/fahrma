@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.auth import LOCALE_PATTERN, Email, RoleLiteral
+from app.schemas.oidc import OidcMeta
 from app.schemas.plans import PlanInfo
 
 PurposeLiteral = Literal["signup", "password_reset", "verify_email", "registration"]
@@ -123,3 +124,6 @@ class MetaRead(BaseModel):
     inactive_delete_months: int | None = None
     # Receipt photos can be attached to fuel entries and expenses (RECEIPTS, on by default)
     receipts: bool = True
+    # Since 0.11: passwords can be used (PASSWORD_LOGIN), and the OIDC provider if one is set up
+    password_login: bool = True
+    oidc: OidcMeta | None = None

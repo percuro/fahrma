@@ -126,3 +126,7 @@ h2.inline { display: inline; margin: 0; font-size: var(--text-lg); }
 /* In the history: entries with a photo */
 .receipt-mark { display: inline-grid; place-items: center; color: var(--muted); }
 .receipt-mark svg { width: 1.125rem; height: 1.125rem; }
+
+/* ---------- Login through the OIDC provider ---------- */
+/* "or" between the password form and the provider's button */
+.divider { margin: 0; text-align: center; }

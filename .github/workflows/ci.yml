@@ -69,12 +69,24 @@ jobs:
           tags: app:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Start OIDC provider (Dex)
+        # Host network: browser and backend both reach the issuer as http://localhost:5556/dex
+        run: |
+          docker run -d --name dex --network host \
+            -v "$PWD/e2e/oidc/dex.yaml:/etc/dex/config.yaml:ro" \
+            ghcr.io/dexidp/dex:v2.46.1 dex serve /etc/dex/config.yaml
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:5556/dex/.well-known/openid-configuration > /dev/null && break
+            sleep 1
+          done
       - name: Start instance
         run: |
           # Mails and push notifications are written as files the tests read (MAIL_DIR, PUSH_DIR);
           # plans as in e2e/plans.json, with an unlimited default so other tests are not limited
           mkdir -m 777 /tmp/mail /tmp/push
-          docker run -d --name app -p 8000:8000 -e PUBLIC_URL=http://localhost:8000 \
+          docker run -d --name app --network host -e PUBLIC_URL=http://localhost:8000 \
+            -e OIDC_ISSUER=http://localhost:5556/dex -e OIDC_CLIENT_ID=fahrma \
+            -e OIDC_CLIENT_SECRET=fahrma-e2e-secret -e OIDC_LABEL=Dex \
             -e REGISTRATION=open -e TERMS_URL=https://example.org/terms -e IMPRINT_URL=https://example.org/imprint \
             -e "MAIL_FROM=fahrma <noreply@example.org>" -e MAIL_DIR=/mail -v /tmp/mail:/mail \
             -e PUSH_DIR=/push -v /tmp/push:/push \
@@ -104,6 +116,7 @@ jobs:
           E2E_BASE_URL: http://localhost:8000
           E2E_MAIL_DIR: /tmp/mail
           E2E_PUSH_DIR: /tmp/push
+          E2E_OIDC: "1"
         run: npx playwright test
       - name: Server log
         if: failure()

@@ -87,5 +87,45 @@ class ReceiptsMigrationTest(unittest.TestCase):
             alembic(path, "downgrade", "0009")
 
 
+class OidcMigrationTest(unittest.TestCase):
+    """0011 adds linked identities and started logins; old sessions count as password logins."""
+
+    def test_identities_and_sessions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "fahrma.db"
+            alembic(path, "upgrade", "0010")
+            connection = sqlite3.connect(path)
+            try:
+                connection.executescript(
+                    """
+                    INSERT INTO users (id, username, display_name, password_hash, is_active, role)
+                      VALUES (1, 'kim', 'Kim', 'x', 1, 'admin'), (2, 'lee', 'Lee', 'x', 1, 'user');
+                    INSERT INTO user_sessions (user_id, token_hash, expires_at) VALUES (1, 'h', '2030-01-01');
+                    """
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            alembic(path, "upgrade", "head")
+            connection = sqlite3.connect(path)
+            try:
+                connection.execute("PRAGMA foreign_keys=ON")
+                self.assertEqual(
+                    connection.execute("SELECT auth_method, authenticated_at FROM user_sessions").fetchone(),
+                    ("password", None),
+                )
+                connection.execute("INSERT INTO oidc_identities (user_id, issuer, subject) VALUES (1, 'i', 's')")
+                with self.assertRaises(sqlite3.IntegrityError):  # one subject, one account
+                    connection.execute("INSERT INTO oidc_identities (user_id, issuer, subject) VALUES (2, 'i', 's')")
+                with self.assertRaises(sqlite3.IntegrityError):  # one link per account
+                    connection.execute("INSERT INTO oidc_identities (user_id, issuer, subject) VALUES (1, 'i', 't')")
+                connection.execute("DELETE FROM users WHERE id = 1")
+                self.assertEqual(connection.execute("SELECT count(*) FROM oidc_identities").fetchone(), (0,))
+                connection.commit()
+            finally:
+                connection.close()
+            alembic(path, "downgrade", "0010")
+
+
 if __name__ == "__main__":
     unittest.main()

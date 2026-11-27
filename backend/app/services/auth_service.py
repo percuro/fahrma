@@ -8,9 +8,9 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import Request, Response, status
 
-from app.config import cookie_secure, env_positive_int
+from app.config import cookie_secure, env_positive_int, password_login_enabled
 from app.errors import AppError
-from app.models.user import ROLE_USER, User, UserSession
+from app.models.user import AUTH_PASSWORD, NO_PASSWORD, ROLE_USER, User, UserSession
 from app.repositories.auth_repository import AuthRepository
 from app.schemas.auth import LoginRequest
 
@@ -67,6 +67,14 @@ def normalize_username(username: str) -> str:
     return username
 
 
+def require_password_login() -> None:
+    """PASSWORD_LOGIN=off: passwords are neither accepted nor set, only the OIDC provider logs in."""
+    if not password_login_enabled():
+        raise AppError(
+            status.HTTP_403_FORBIDDEN, "password_login_disabled", "This instance only logs in through the provider"
+        )
+
+
 def clear_session_cookie(response: Response) -> None:
     settings = cookie_settings()
     response.delete_cookie(
@@ -83,13 +91,16 @@ class AuthService:
         self.repository = repository
 
     def login(self, login_in: LoginRequest, request: Request, response: Response) -> User:
+        require_password_login()
         user = self.repository.get_user_by_username(login_in.username)
         if user is None or not user.is_active or not self.verify_password(login_in.password, user.password_hash):
             raise AppError(status.HTTP_401_UNAUTHORIZED, "invalid_credentials", "Wrong username or password")
         self.start_session(user, request, response)
         return user
 
-    def start_session(self, user: User, request: Request, response: Response) -> UserSession:
+    def start_session(
+        self, user: User, request: Request, response: Response, auth_method: str = AUTH_PASSWORD
+    ) -> UserSession:
         """Create a session for an already verified account and set the cookie."""
         now = utcnow()
         self.repository.delete_expired_sessions(now)
@@ -101,6 +112,7 @@ class AuthService:
             now + timedelta(minutes=SESSION_IDLE_MINUTES),
             user_agent,
             now,
+            auth_method,
         )
         # Persistent cookie (max_age), otherwise iOS drops it when the web app is closed
         response.set_cookie(
@@ -146,7 +158,7 @@ class AuthService:
     def create_user(
         self,
         username: str,
-        password: str,
+        password: str | None,
         display_name: str | None = None,
         role: str = ROLE_USER,
         locale: str | None = None,
@@ -155,11 +167,12 @@ class AuthService:
         username = normalize_username(username)
         if self.repository.get_user_by_username(username) is not None:
             raise AccountError("username_taken", "Username already exists", status.HTTP_409_CONFLICT)
-        self.check_password(password)
+        # None: an account that logs in through the OIDC provider only
+        if password is not None:
+            self.check_password(password)
         name = (display_name or "").strip() or username
-        user = User(
-            username=username, display_name=name, password_hash=self.hash_password(password), role=role, locale=locale
-        )
+        password_hash = self.hash_password(password) if password is not None else NO_PASSWORD
+        user = User(username=username, display_name=name, password_hash=password_hash, role=role, locale=locale)
         return self.repository.add_user(user, commit=commit)
 
     def set_password(self, username: str, password: str) -> None:

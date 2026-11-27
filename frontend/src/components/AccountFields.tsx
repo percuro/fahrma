@@ -2,9 +2,11 @@ import type { AccountForm } from './account-form';
 import { useT } from '../i18n';
 
 /** Name, username and password twice – for registration, invitations and the setup. */
-export function AccountFields({ form, passwordOnly = false, passwordLabel }: {
+export function AccountFields({ form, passwordOnly = false, withoutPassword = false, passwordLabel }: {
   form: AccountForm;
   passwordOnly?: boolean;
+  /** PASSWORD_LOGIN=off: the account logs in through the provider only */
+  withoutPassword?: boolean;
   passwordLabel?: string;
 }) {
   const t = useT();
@@ -26,14 +28,18 @@ export function AccountFields({ form, passwordOnly = false, passwordLabel }: {
           </label>
         </>
       )}
-      <label className="field">
-        <span>{passwordLabel ?? t.invite.password}</span>
-        <input type="password" value={values.password} onChange={set('password')} required autoComplete="new-password" />
-      </label>
-      <label className="field">
-        <span>{t.auth.passwordRepeat}</span>
-        <input type="password" value={values.repeat} onChange={set('repeat')} required autoComplete="new-password" />
-      </label>
+      {!withoutPassword && (
+        <>
+          <label className="field">
+            <span>{passwordLabel ?? t.invite.password}</span>
+            <input type="password" value={values.password} onChange={set('password')} required autoComplete="new-password" />
+          </label>
+          <label className="field">
+            <span>{t.auth.passwordRepeat}</span>
+            <input type="password" value={values.repeat} onChange={set('repeat')} required autoComplete="new-password" />
+          </label>
+        </>
+      )}
     </>
   );
 }

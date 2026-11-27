@@ -69,7 +69,7 @@ test('an expired session keeps the input: log in again and save', async ({ page,
   await expect(page.getByText('Deine Sitzung ist abgelaufen')).toBeVisible();
   await page.getByLabel('Benutzername').fill(process.env.E2E_USERNAME ?? 'e2e');
   await page.getByLabel('Passwort').fill(process.env.E2E_PASSWORD ?? 'e2e-password-123');
-  await page.getByRole('button', { name: 'Anmelden' }).click();
+  await page.getByRole('button', { name: 'Anmelden', exact: true }).click();
 
   await expect(page.getByLabel('km-Stand Ende')).toHaveValue('10077');
   await expect(page.getByLabel(/Notiz/)).toHaveValue('kept after login');

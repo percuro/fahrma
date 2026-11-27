@@ -4,6 +4,10 @@ import { apiFetch, errorText } from '../lib/api';
 import type { Me } from '../lib/types';
 import { ME_KEY } from '../hooks/useMe';
 import { useT } from '../i18n';
+import { useMeta } from '../hooks/useMeta';
+import { OidcButton } from '../components/OidcButton';
+import { useCallbackParams } from '../hooks/useCallbackParams';
+import { callbackErrorText } from '../lib/oidc';
 
 /** First-run setup: create the first account with the token from the server log. */
 export function SetupPage() {
@@ -15,6 +19,20 @@ export function SetupPage() {
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const mismatch = confirm.length > 0 && password !== confirm;
+  const meta = useMeta();
+  const passwords = meta.data?.password_login !== false;
+  const oidc = !!meta.data?.oidc;
+  const [missing, setMissing] = useState(false);
+  const callback = useCallbackParams();
+  /** The first account through the provider: token, name and username, no password. */
+  const providerBody = () => {
+    if (!token.trim() || !/^[A-Za-z0-9._-]{2,80}$/.test(username.trim())) {
+      setMissing(true);
+      return null;
+    }
+    setMissing(false);
+    return { token: token.trim(), username: username.trim(), display_name: displayName.trim() || null };
+  };
 
   const setup = useMutation({
     mutationFn: () =>
@@ -62,6 +80,7 @@ export function SetupPage() {
             pattern="[A-Za-z0-9._\-]+" title={t.auth.usernameHint}
             value={username} onChange={(e) => setUsername(e.target.value)} />
         </label>
+        {passwords && <>
         <label className="field">
           <span>{t.auth.passwordMin}</span>
           <input name="new-password" type="password" autoComplete="new-password" required minLength={12}
@@ -74,10 +93,19 @@ export function SetupPage() {
             value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </label>
         {mismatch && <p id="setup-mismatch" className="error" role="alert">{t.auth.passwordMismatch}</p>}
+        </>}
         {setup.isError && <p className="error" role="alert">{errorText(setup.error)}</p>}
-        <button type="submit" className="button primary" disabled={setup.isPending || mismatch}>
-          {setup.isPending ? t.setup.submitting : t.setup.submit}
-        </button>
+        {callback.error && (
+          <p className="error" role="alert">{callbackErrorText(callback.error)}</p>
+        )}
+        {missing && <p className="error" role="alert">{t.setup.missing}</p>}
+        {passwords && (
+          <button type="submit" className="button primary" disabled={setup.isPending || mismatch}>
+            {setup.isPending ? t.setup.submitting : t.setup.submit}
+          </button>
+        )}
+        {oidc && passwords && <p className="subtle divider">{t.oidc.or}</p>}
+        {oidc && <OidcButton action="continue" path="/v1/setup/oidc" primary={!passwords} body={providerBody} />}
       </form>
     </main>
   );

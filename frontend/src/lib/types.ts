@@ -16,6 +16,16 @@ export interface Me {
   groups: GroupBrief[];
   today: string;
   timezone: string;
+  /** false: logs in through the OIDC provider only (since 0.11) */
+  has_password?: boolean;
+  oidc?: OidcLink | null;
+}
+
+/** The account's link to the OIDC provider, as the provider last described it */
+export interface OidcLink {
+  email: string | null;
+  preferred_username: string | null;
+  linked_at: string;
 }
 
 export interface Member {
@@ -285,6 +295,10 @@ export interface Meta {
   inactive_delete_months?: number | null;
   /** Receipt photos can be attached (since 0.10; missing = off) */
   receipts?: boolean;
+  /** Passwords can be used (since 0.11; missing = yes) */
+  password_login?: boolean;
+  /** Login through an OIDC provider; null = not set up. label: name on the button */
+  oidc?: { label: string | null } | null;
 }
 
 export interface DeviceSession {
@@ -293,6 +307,8 @@ export interface DeviceSession {
   last_seen_at: string | null;
   device: string | null;
   current: boolean;
+  /** How the session was started (since 0.11) */
+  auth_method?: 'password' | 'oidc';
 }
 
 export interface DeletionPreview {
@@ -313,6 +329,9 @@ export interface AdminUser {
   group_count: number;
   /** The day a warned, unused account will be deleted */
   deletion_due?: string | null;
+  /** Since 0.11: false = logs in through the OIDC provider only */
+  has_password?: boolean;
+  oidc_linked?: boolean;
 }
 
 /** A group as instance admins see it: plan and counts, never entries or amounts. */

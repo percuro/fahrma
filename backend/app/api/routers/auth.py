@@ -10,9 +10,17 @@ from app.config import get_default_timezone_name, get_operator_links, get_regist
 from app.db.database import get_db
 from app.errors import AppError
 from app.repositories.auth_repository import AuthRepository
-from app.schemas.auth import ForgotPassword, LoginRequest, MeRead, ProfileUpdate, RegisterRequest, RegistrationPending
+from app.schemas.auth import (
+    ForgotPassword,
+    LoginRequest,
+    MeRead,
+    OidcLinkRead,
+    ProfileUpdate,
+    RegisterRequest,
+    RegistrationPending,
+)
 from app.services import group_service, setup_service
-from app.services.auth_service import AccountError, AuthService
+from app.services.auth_service import AccountError, AuthService, require_password_login
 from app.services.invitation_service import InvitationService
 from app.services.login_rate_limiter import LoginRateLimiter, login_rate_limiter
 
@@ -34,6 +42,16 @@ def me_response(db: Session, user, today: date) -> MeRead:
         groups=group_service.groups_of(db, user),
         today=today.isoformat(),
         timezone=get_default_timezone_name(),
+        has_password=user.has_password,
+        oidc=(
+            OidcLinkRead(
+                email=user.oidc_identity.email,
+                preferred_username=user.oidc_identity.preferred_username,
+                linked_at=user.oidc_identity.created_at,
+            )
+            if user.oidc_identity is not None
+            else None
+        ),
     )
 
 
@@ -79,6 +97,7 @@ def register(
     """
     if get_registration_mode() != "open":
         raise AppError(status.HTTP_403_FORBIDDEN, "registration_closed", "Registration is closed")
+    require_password_login()
     if setup_service.needs_setup(db):
         # Otherwise a stranger could take over a fresh instance before its operator runs the setup
         raise AppError(status.HTTP_409_CONFLICT, "setup_required", "The instance has not been set up yet")
@@ -110,6 +129,7 @@ def forgot_password(data: ForgotPassword, request: Request, background: Backgrou
 
     The answer is the same whether the account exists or not.
     """
+    require_password_login()
     InvitationService(db, background).request_password_reset(data.login, request)
     return {"status": "accepted"}
 

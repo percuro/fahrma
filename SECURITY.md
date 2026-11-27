@@ -13,4 +13,5 @@ Only the latest release receives security fixes. Updating is a `docker compose p
 ## Scope notes
 
 - The app is designed to run behind a TLS reverse proxy, with the container port bound to localhost.
+- Login through an OpenID Connect provider accepts only asymmetrically signed ID tokens and links accounts by issuer and subject, never by e-mail address (see [docs/oidc.md](docs/oidc.md)).
 - Rate limits and the first-run setup token are kept in memory; run a single instance (see [docs/configuration.md](docs/configuration.md#limits)).

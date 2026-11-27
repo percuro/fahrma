@@ -20,6 +20,9 @@ class AdminUserRead(BaseModel):
     group_count: int
     # INACTIVE_DELETE_MONTHS: the day this account will be deleted unless it is used again
     deletion_due: date | None = None
+    # Since 0.11: False = logs in through the OIDC provider only
+    has_password: bool = True
+    oidc_linked: bool = False
 
 
 class AdminUserUpdate(BaseModel):
