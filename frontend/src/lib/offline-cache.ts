@@ -38,6 +38,10 @@ export function restoreCache(queryClient: QueryClient): void {
     for (const { key, data, updatedAt } of saved.queries) {
       if (isKept(key)) queryClient.setQueryData(key, data, { updatedAt });
     }
+    // Shown at once, but never taken as fresh: the first use loads them again. Otherwise a state
+    // saved less than staleTime ago (e.g. the account just before confirming its address in
+    // another tab or on the invitation page) would stay on screen after a reload.
+    void queryClient.invalidateQueries({ predicate: (query) => isKept(query.queryKey), refetchType: 'none' });
   } catch {
     // A broken cache only means a normal start
   }

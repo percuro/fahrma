@@ -37,6 +37,10 @@ Beta hardening: a security log of logins and account changes, settings that no l
 - The app start loads about a sixth less code (494 instead of 591 kB, 157 kB compressed): pages other than the start, the overview and the trip form load the first time they are opened. Offline use is unchanged; the app keeps all pages on the device.
 - The group list of the instance administration and of the operator API reads all groups with a fixed number of queries instead of five per group.
 
+### Fixes
+
+- After a reload, the app could show the account as it was before a change made a moment earlier elsewhere – for example still "no address" right after confirming the e-mail address from the link. What the app keeps for offline use is shown at once as before, but now always loaded again when the app starts.
+
 ### Upgrade notes
 
 - **Check the log after the update** (`docker compose logs app`): a setting with a value that was silently ignored before now stops the start and names the variable.
